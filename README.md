@@ -21,6 +21,7 @@ A powerful Obsidian plugin that helps you manage and navigate comments in your n
 2. Create a folder called `obsidian-comments-manager` in your vault's `.obsidian/plugins/` directory
 3. Place the downloaded files in this folder
 4. Reload Obsidian and enable the plugin in Settings → Community Plugins
+5. Or use obsidian BRAT plugin with github link to this repo
 
 ### Development Installation
 
