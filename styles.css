@@ -1,0 +1,965 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+*/
+
+/* Panel Styles */
+.comments-header {
+	padding: 10px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.comments-title {
+	margin: 0;
+	color: var(--text-normal);
+}
+
+.comments-empty {
+	padding: 20px;
+	text-align: center;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.comments-list {
+	padding: 5px;
+}
+
+/* Header Section Styles */
+.comment-header-section {
+	margin-bottom: 4px;
+}
+
+.comment-header {
+	display: flex;
+	align-items: center;
+	padding: 4px 8px;
+	background-color: var(--background-secondary);
+	border-radius: 4px;
+	margin-bottom: 2px;
+	font-weight: 500;
+	color: var(--text-normal);
+	font-size: 13px;
+	transition: background-color 0.1s ease;
+}
+
+.comment-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.comment-header-virtual {
+	/* Hide virtual/intermediate headers completely */
+	display: none !important;
+}
+
+.comment-header-virtual:hover {
+	/* Also hide the hover state */
+	display: none !important;
+}
+
+.comment-collapse-icon {
+	margin-right: 6px;
+	cursor: pointer;
+	user-select: none;
+	font-size: 10px;
+	color: var(--text-muted);
+	min-width: 12px;
+	transition: color 0.1s ease;
+}
+
+.comment-collapse-icon:hover {
+	color: var(--text-normal);
+}
+
+.comment-header-text {
+	flex: 1;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.comment-group-content {
+	transition: all 0.2s ease;
+}
+
+.comment-group-comments {
+	margin-left: 20px;
+	border-left: 2px solid var(--background-modifier-border);
+	padding-left: 8px;
+	margin-top: 4px;
+}
+
+/* Individual Comment Styles */
+.comment-item {
+	padding: 8px 12px;
+	margin: 2px 0;
+	border-radius: 4px;
+	cursor: pointer;
+	border: 1px solid transparent;
+	transition: all 0.1s ease;
+	position: relative;
+}
+
+.comment-item:hover:not(.comment-editing),
+.comment-item-hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--background-modifier-border);
+}
+
+.comment-item.comment-editing {
+	background-color: var(--background-modifier-form-field);
+	border-color: var(--interactive-accent);
+	cursor: default;
+}
+
+.comment-content {
+	line-height: 1.4;
+	margin-bottom: 8px;
+}
+
+.comment-text {
+	color: var(--text-normal);
+	font-size: 14px;
+	margin-bottom: 4px;
+	word-wrap: break-word;
+	border-radius: 3px;
+	padding: 2px 4px;
+	min-height: 20px;
+}
+
+.comment-text[contenteditable="true"]:focus {
+	outline: 1px solid var(--interactive-accent);
+	background-color: var(--background-primary);
+}
+
+.comment-line {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.comment-actions {
+	display: flex;
+	gap: 4px;
+	justify-content: flex-end;
+	margin-top: 4px;
+}
+
+.comment-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+}
+
+.comment-save-btn {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
+.comment-save-btn:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.comment-cancel-btn {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.comment-cancel-btn:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.comment-delete-btn {
+	background-color: var(--background-secondary);
+	color: var(--text-error);
+	border-color: var(--background-modifier-border);
+	font-weight: bold;
+	width: 20px;
+	height: 20px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.comment-delete-btn:hover {
+	background-color: var(--background-modifier-error);
+	border-color: var(--text-error);
+}
+
+/* Additional styles for collapse/expand buttons - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+	
+	.comments-controls {
+		align-self: flex-end;
+	}
+}
+
+/* Additional styles for collapse/expand toggle button - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-toggle-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+}
+
+.comments-toggle-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-toggle-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-toggle-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+.comments-toggle-icon {
+	font-size: 12px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Legacy styles for the old buttons - can be removed if not needed */
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+	
+	.comments-controls {
+		align-self: flex-end;
+	}
+}
+
+/* Additional styles for collapse/expand toggle button - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-toggle-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+}
+
+.comments-toggle-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-toggle-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-toggle-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+.comments-toggle-icon {
+	font-size: 11px;
+	font-family: var(--font-monospace);
+	font-weight: bold;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+}
+
+.comments-toggle-btn:hover .comments-toggle-icon {
+	color: var(--text-normal);
+}
+
+/* Legacy styles for the old buttons - can be removed if not needed */
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 4px;
+	}
+	
+	.comments-controls {
+		align-self: flex-end;
+	}
+}
+
+/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-title {
+	flex: 1;
+	text-align: left;
+}
+
+.comments-toggle-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	margin: 0 auto; /* Center the button */
+}
+
+.comments-spacer {
+	flex: 1;
+}
+
+.comments-toggle-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-toggle-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-toggle-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+.comments-toggle-icon {
+	font-size: 11px;
+	font-family: var(--font-monospace);
+	font-weight: bold;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+}
+
+.comments-toggle-btn:hover .comments-toggle-icon {
+	color: var(--text-normal);
+}
+
+/* Search functionality styles */
+.comments-search-container {
+	position: relative;
+	margin-bottom: 8px;
+}
+
+.comments-search-input {
+	width: 100%;
+	padding: 6px 30px 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	font-size: 13px;
+	transition: border-color 0.1s ease;
+}
+
+.comments-search-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.comments-search-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-search-input::placeholder {
+	color: var(--text-muted);
+}
+
+.comments-clear-search {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 20px;
+	height: 20px;
+	border: none;
+	background: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 2px;
+	font-size: 14px;
+	font-weight: bold;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.1s ease;
+}
+
+.comments-clear-search:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Legacy styles for the old buttons - can be removed if not needed */
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+	
+	.comments-title {
+		text-align: center;
+	}
+	
+	.comments-spacer {
+		display: none;
+	}
+}
+
+/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-title {
+	flex: 1;
+	text-align: left;
+}
+
+.comments-toggle-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	margin: 0 auto; /* Center the button */
+}
+
+.comments-spacer {
+	flex: 1;
+}
+
+.comments-toggle-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-toggle-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-toggle-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+.comments-toggle-icon {
+	font-size: 14px;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+}
+
+.comments-toggle-btn:hover .comments-toggle-icon {
+	color: var(--text-normal);
+}
+
+/* Search functionality styles */
+.comments-search-container {
+	position: relative;
+	margin-bottom: 8px;
+}
+
+.comments-search-input {
+	width: 100%;
+	padding: 6px 30px 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	font-size: 13px;
+	transition: border-color 0.1s ease;
+}
+
+.comments-search-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.comments-search-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-search-input::placeholder {
+	color: var(--text-muted);
+}
+
+.comments-clear-search {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 20px;
+	height: 20px;
+	border: none;
+	background: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 2px;
+	font-size: 14px;
+	font-weight: bold;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.1s ease;
+}
+
+.comments-clear-search:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Search highlighting styles */
+.search-highlight {
+	background-color: var(--text-highlight-bg);
+	color: var(--text-on-accent);
+	padding: 1px 2px;
+	border-radius: 2px;
+	font-weight: 500;
+}
+
+/* Legacy styles for the old buttons - can be removed if not needed */
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+	
+	.comments-title {
+		text-align: center;
+	}
+	
+	.comments-spacer {
+		display: none;
+	}
+}
+
+/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
+
+.comments-title-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.comments-title {
+	flex: 1;
+	text-align: left;
+}
+
+.comments-toggle-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 24px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	margin: 0 auto; /* Center the button */
+}
+
+.comments-spacer {
+	flex: 1;
+}
+
+.comments-toggle-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-toggle-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-toggle-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+.comments-toggle-icon {
+	font-size: 18px;
+	font-weight: bold;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+}
+
+.comments-toggle-btn:hover .comments-toggle-icon {
+	color: var(--text-normal);
+}
+
+/* Search functionality styles */
+.comments-search-container {
+	position: relative;
+	margin-bottom: 8px;
+}
+
+.comments-search-input {
+	width: 100%;
+	padding: 6px 30px 6px 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	color: var(--text-normal);
+	border-radius: 4px;
+	font-size: 13px;
+	transition: border-color 0.1s ease;
+}
+
+.comments-search-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.comments-search-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-search-input::placeholder {
+	color: var(--text-muted);
+}
+
+.comments-clear-search {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 20px;
+	height: 20px;
+	border: none;
+	background: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: 2px;
+	font-size: 14px;
+	font-weight: bold;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.1s ease;
+}
+
+.comments-clear-search:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+/* Search highlighting styles */
+.search-highlight {
+	background-color: var(--text-highlight-bg);
+	color: var(--text-on-accent);
+	padding: 1px 2px;
+	border-radius: 2px;
+	font-weight: 500;
+}
+
+/* Legacy styles for the old buttons - can be removed if not needed */
+.comments-controls {
+	display: flex;
+	gap: 4px;
+}
+
+.comments-control-btn {
+	padding: 2px 8px;
+	font-size: 11px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	color: var(--text-normal);
+	border-radius: 3px;
+	cursor: pointer;
+	transition: all 0.1s ease;
+	white-space: nowrap;
+}
+
+.comments-control-btn:hover:not(:disabled) {
+	background: var(--background-modifier-hover);
+	border-color: var(--interactive-accent);
+}
+
+.comments-control-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.comments-control-btn:active:not(:disabled) {
+	background: var(--background-modifier-active);
+	transform: translateY(1px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+	
+	.comments-title {
+		text-align: center;
+	}
+	
+	.comments-spacer {
+		display: none;
+	}
+}

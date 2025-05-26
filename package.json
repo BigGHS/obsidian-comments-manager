@@ -1,0 +1,30 @@
+{
+	"name": "obsidian-comments-manager",
+	"version": "1.0.0",
+	"description": "Manage comments in your Obsidian notes with a dedicated side panel. Edit, delete, and navigate comments easily.",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+		"version": "node version-bump.mjs && git add manifest.json versions.json"
+	},
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"comments",
+		"notes",
+		"annotation"
+	],
+	"author": "Your Name",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"@typescript-eslint/eslint-plugin": "5.29.0",
+		"@typescript-eslint/parser": "5.29.0",
+		"builtin-modules": "3.3.0",
+		"esbuild": "^0.25.4",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "4.7.4"
+	}
+}

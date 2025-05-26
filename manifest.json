@@ -1,0 +1,11 @@
+{
+	"id": "obsidian-comments-manager",
+	"name": "Comments Manager",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Manage comments in your Obsidian notes with a dedicated side panel. Edit, delete, and navigate comments easily.",
+	"author": "Your Name",
+	"authorUrl": "https://github.com/yourusername/obsidian-comments-manager",
+	"fundingUrl": "https://buymeacoffee.com/yourusername",
+	"isDesktopOnly": false
+}
