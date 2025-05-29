@@ -133,3 +133,7 @@ If you find this plugin helpful, consider:
 - In-panel and in-document editing
 - Customizable settings
 - State preservation for manual expansions
+
+### Version 1.1.0
+- Amended code to allow for multi-line comments where the comments start and ending markers (default "%%") are on different lines
+
