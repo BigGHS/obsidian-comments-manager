@@ -188,27 +188,31 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 
 	extractComments(content: string): CommentData[] {
-		const lines = content.split('\n');
 		const comments: CommentData[] = [];
-		const commentRegex = new RegExp(`${this.escapeRegex(this.settings.commentPrefix)}(.*?)${this.escapeRegex(this.settings.commentPrefix)}`, 'g');
+		const prefix = this.escapeRegex(this.settings.commentPrefix);
 		
-		let currentPos = 0;
-		lines.forEach((line: string, lineIndex: number) => {
-			const lineStartPos = currentPos;
-			let match;
-			commentRegex.lastIndex = 0; // Reset regex state
+		// Create regex to match multi-line comments
+		const commentRegex = new RegExp(`${prefix}(.*?)${prefix}`, 'gs'); // 'g' for global, 's' for dotall (makes . match newlines)
+		
+		let match;
+		while ((match = commentRegex.exec(content)) !== null) {
+			const startPos = match.index;
+			const endPos = match.index + match[0].length;
+			const commentText = match[1].trim();
 			
-			while ((match = commentRegex.exec(line)) !== null) {
-				comments.push({
-					text: match[1].trim(),
-					line: lineIndex,
-					startPos: lineStartPos + match.index,
-					endPos: lineStartPos + match.index + match[0].length,
-					fullMatch: match[0]
-				});
-			}
-			currentPos += line.length + 1; // +1 for newline character
-		});
+			// Find which line the comment starts on
+			const beforeComment = content.substring(0, startPos);
+			const startLine = (beforeComment.match(/\n/g) || []).length;
+			
+			// Preserve line breaks in the comment text for display
+			comments.push({
+				text: commentText,
+				line: startLine,
+				startPos: startPos,
+				endPos: endPos,
+				fullMatch: match[0]
+			});
+		}
 		
 		return comments;
 	}
@@ -370,7 +374,7 @@ export default class CommentsManagerPlugin extends Plugin {
 
 	highlightCommentInEditor(comment: CommentData) {
 		this.debug('highlightCommentInEditor called', comment);
-	
+
 		const file = this.app.workspace.getActiveFile();
 		if (!file) {
 			new Notice('No active markdown file');
@@ -405,29 +409,25 @@ export default class CommentsManagerPlugin extends Plugin {
 			
 			this.debug('Found target comment:', target);
 
-			// Calculate character position within the line for the comment start
-			const line = editor.getLine(target.line);
-			const commentStartInLine = line.indexOf(target.fullMatch);
+			// For multi-line comments, position cursor at the start of the comment
+			const beforeComment = content.substring(0, target.startPos);
+			const startLine = (beforeComment.match(/\n/g) || []).length;
+			const startLineContent = content.split('\n')[startLine];
+			const commentStartInLine = beforeComment.length - beforeComment.lastIndexOf('\n') - 1;
 			
-			let startCh = 0;
-			let endCh = line.length;
+			// Position cursor at the start of the comment (after the opening prefix)
+			const prefixLength = this.settings.commentPrefix.length;
+			const cursorPos = { 
+				line: startLine, 
+				ch: commentStartInLine + prefixLength + (startLineContent.substring(commentStartInLine + prefixLength).match(/^\s*/) || [''])[0].length
+			};
 			
-			if (commentStartInLine !== -1) {
-				// Position cursor at the start of the comment text (after the prefix)
-				const prefixLength = this.settings.commentPrefix.length + 1; // +1 for space
-				startCh = commentStartInLine + prefixLength;
-				endCh = commentStartInLine + target.fullMatch.length - prefixLength; // Before closing prefix
-			}
-
-			// Set selection to highlight the comment content
-			editor.setSelection(
-				{ line: target.line, ch: startCh },
-				{ line: target.line, ch: endCh }
-			);
+			// Set cursor position at the start of comment content
+			editor.setCursor(cursorPos);
 			
 			// Scroll the comment into view
 			editor.scrollIntoView(
-				{ from: { line: target.line, ch: startCh }, to: { line: target.line, ch: endCh } },
+				{ from: cursorPos, to: cursorPos },
 				true
 			);
 			
@@ -1075,18 +1075,36 @@ class CommentsView extends ItemView {
 		// Comment content
 		const contentEl = commentEl.createEl('div', { cls: 'comment-content' });
 		
-		// Editable comment text
-		const textEl = contentEl.createEl('div', { 
-			cls: 'comment-text',
-			attr: { contenteditable: 'true', spellcheck: 'false' }
-		});
+		// Editable comment text - use textarea for multi-line support
+		const isMultiLine = comment.text.includes('\n');
+		
+		let textEl: HTMLElement;
+		if (isMultiLine) {
+			// Use textarea for multi-line comments
+			textEl = contentEl.createEl('textarea', { 
+				cls: 'comment-text comment-textarea',
+				attr: { 
+					spellcheck: 'false',
+					rows: (comment.text.split('\n').length + 1).toString()
+				}
+			}) as HTMLTextAreaElement;
+			(textEl as HTMLTextAreaElement).value = comment.text || '';
+		} else {
+			// Use div for single-line comments
+			textEl = contentEl.createEl('div', { 
+				cls: 'comment-text',
+				attr: { contenteditable: 'true', spellcheck: 'false' }
+			});
+			textEl.textContent = comment.text || '(empty comment)';
+		}
 		
 		// Apply search highlighting if there's a current search term
 		const currentSearchTerm = (this as any).currentSearchTerm || '';
-		if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm)) {
-			textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
-		} else {
-			textEl.textContent = comment.text || '(empty comment)';
+		if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
+			// Only apply highlighting to single-line comments in contenteditable divs
+			if (textEl.tagName === 'DIV') {
+				textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
+			}
 		}
 		
 		// Line number (not editable)
@@ -1122,35 +1140,61 @@ class CommentsView extends ItemView {
 		let originalText = comment.text;
 		let isEditing = false;
 
-		// Handle text editing
-		textEl.addEventListener('input', () => {
+		// Handle text editing - works for both div and textarea
+		const handleInput = () => {
 			if (!isEditing) {
 				isEditing = true;
 				saveBtn.style.display = 'inline-block';
 				cancelBtn.style.display = 'inline-block';
 				deleteBtn.style.display = 'none';
 				commentEl.addClass('comment-editing');
-				
-				// Remove highlighting when editing
-				textEl.innerHTML = '';
-				textEl.textContent = originalText;
 			}
-		});
+		};
+
+		if (textEl.tagName === 'TEXTAREA') {
+			(textEl as HTMLTextAreaElement).addEventListener('input', handleInput);
+			
+			// Auto-resize textarea as content changes
+			const autoResize = () => {
+				const textarea = textEl as HTMLTextAreaElement;
+				textarea.style.height = 'auto';
+				textarea.style.height = textarea.scrollHeight + 'px';
+			};
+			
+			(textEl as HTMLTextAreaElement).addEventListener('input', autoResize);
+			// Initial resize
+			setTimeout(autoResize, 0);
+		} else {
+			textEl.addEventListener('input', handleInput);
+		}
 
 		// Handle keyboard shortcuts in edit mode
-		textEl.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' && !e.shiftKey) {
+		const handleKeydown = (e: KeyboardEvent) => {
+			if (e.key === 'Enter' && !e.shiftKey && textEl.tagName !== 'TEXTAREA') {
+				// For contenteditable divs, Enter saves (unless Shift+Enter)
+				e.preventDefault();
+				saveComment();
+			} else if (e.key === 'Enter' && e.ctrlKey && textEl.tagName === 'TEXTAREA') {
+				// For textareas, Ctrl+Enter saves
 				e.preventDefault();
 				saveComment();
 			} else if (e.key === 'Escape') {
 				e.preventDefault();
 				cancelEdit();
 			}
-		});
+		};
+
+		textEl.addEventListener('keydown', handleKeydown);
 
 		// Save comment function
 		const saveComment = () => {
-			const newText = textEl.textContent?.trim() || '';
+			let newText: string;
+			if (textEl.tagName === 'TEXTAREA') {
+				newText = (textEl as HTMLTextAreaElement).value.trim();
+			} else {
+				newText = textEl.textContent?.trim() || '';
+			}
+			
 			if (newText !== originalText) {
 				this.updateCommentInEditor(comment, newText);
 				originalText = newText;
@@ -1160,11 +1204,15 @@ class CommentsView extends ItemView {
 
 		// Cancel edit function
 		const cancelEdit = () => {
-			// Restore original text with highlighting if applicable
-			if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
-				textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+			if (textEl.tagName === 'TEXTAREA') {
+				(textEl as HTMLTextAreaElement).value = originalText;
 			} else {
-				textEl.textContent = originalText;
+				// Restore original text with highlighting if applicable
+				if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
+					textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+				} else {
+					textEl.textContent = originalText;
+				}
 			}
 			exitEditMode();
 		};
@@ -1194,13 +1242,13 @@ class CommentsView extends ItemView {
 			e.stopPropagation();
 			
 			// Add confirmation dialog
-			const confirmDelete = confirm(`Are you sure you want to delete this comment?\n\n"${comment.text}"`);
+			const confirmDelete = confirm(`Are you sure you want to delete this comment?\n\n"${comment.text.length > 100 ? comment.text.substring(0, 100) + '...' : comment.text}"`);
 			if (confirmDelete) {
 				this.deleteCommentFromEditor(comment);
 			}
 		});
 
-		// Make the comment clickable (only when not editing) - improved cursor positioning
+		// Make the comment clickable (only when not editing)
 		commentEl.addEventListener('click', (e) => {
 			this.debug('Comment clicked, isEditing:', isEditing, 'target:', e.target);
 			
@@ -1231,19 +1279,22 @@ class CommentsView extends ItemView {
 				textEl.focus();
 				
 				// Select all text for easy editing
-				const range = document.createRange();
-				range.selectNodeContents(textEl);
-				const selection = window.getSelection();
-				if (selection) {
-					selection.removeAllRanges();
-					selection.addRange(range);
+				if (textEl.tagName === 'TEXTAREA') {
+					(textEl as HTMLTextAreaElement).select();
+				} else {
+					const range = document.createRange();
+					range.selectNodeContents(textEl);
+					const selection = window.getSelection();
+					if (selection) {
+						selection.removeAllRanges();
+						selection.addRange(range);
+					}
 				}
 				
 				return;
 			}
 			
-			// For clicks anywhere else in the comment (container, line number, content area but not text)
-			// Navigate to the comment in the document
+			// For clicks anywhere else in the comment, navigate to the comment in the document
 			this.debug('Calling highlightCommentInEditor');
 			e.preventDefault();
 			e.stopPropagation();
@@ -1427,24 +1478,15 @@ class CommentsView extends ItemView {
 		
 		this.debug('Deleting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
 		
-		// Get the line containing the comment to handle it more carefully
-		const lines = currentContent.split('\n');
-		const commentLine = lines[matchingComment.line];
+		// Get the content before and after the comment
+		const beforeComment = currentContent.substring(0, matchingComment.startPos);
+		const afterComment = currentContent.substring(matchingComment.endPos);
 		
-		this.debug('Original line:', commentLine);
+		// Simply remove the comment by joining before and after
+		const newContent = beforeComment + afterComment;
 		
-		// Remove just the comment from the line, preserving other content
-		const commentPattern = new RegExp(this.plugin.escapeRegex(matchingComment.fullMatch), 'g');
-		const cleanedLine = commentLine.replace(commentPattern, '');
-		
-		this.debug('Cleaned line:', cleanedLine);
-		
-		// Replace the line in the content
-		lines[matchingComment.line] = cleanedLine;
-		const newContent = lines.join('\n');
-		
-		// Clean up any extra spaces that might be left behind, but be conservative
-		const finalContent = newContent.replace(/  +/g, ' '); // Replace multiple spaces with single space
+		// Clean up any double spaces that might be left behind
+		const finalContent = newContent.replace(/  +/g, ' ');
 		
 		editor.setValue(finalContent);
 		

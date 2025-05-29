@@ -131,25 +131,24 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
     });
   }
   extractComments(content) {
-    const lines = content.split("\n");
     const comments = [];
-    const commentRegex = new RegExp(`${this.escapeRegex(this.settings.commentPrefix)}(.*?)${this.escapeRegex(this.settings.commentPrefix)}`, "g");
-    let currentPos = 0;
-    lines.forEach((line, lineIndex) => {
-      const lineStartPos = currentPos;
-      let match;
-      commentRegex.lastIndex = 0;
-      while ((match = commentRegex.exec(line)) !== null) {
-        comments.push({
-          text: match[1].trim(),
-          line: lineIndex,
-          startPos: lineStartPos + match.index,
-          endPos: lineStartPos + match.index + match[0].length,
-          fullMatch: match[0]
-        });
-      }
-      currentPos += line.length + 1;
-    });
+    const prefix = this.escapeRegex(this.settings.commentPrefix);
+    const commentRegex = new RegExp(`${prefix}(.*?)${prefix}`, "gs");
+    let match;
+    while ((match = commentRegex.exec(content)) !== null) {
+      const startPos = match.index;
+      const endPos = match.index + match[0].length;
+      const commentText = match[1].trim();
+      const beforeComment = content.substring(0, startPos);
+      const startLine = (beforeComment.match(/\n/g) || []).length;
+      comments.push({
+        text: commentText,
+        line: startLine,
+        startPos,
+        endPos,
+        fullMatch: match[0]
+      });
+    }
     return comments;
   }
   extractHeaders(content) {
@@ -281,21 +280,18 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
       }
       const target = match || comment;
       this.debug("Found target comment:", target);
-      const line = editor.getLine(target.line);
-      const commentStartInLine = line.indexOf(target.fullMatch);
-      let startCh = 0;
-      let endCh = line.length;
-      if (commentStartInLine !== -1) {
-        const prefixLength = this.settings.commentPrefix.length + 1;
-        startCh = commentStartInLine + prefixLength;
-        endCh = commentStartInLine + target.fullMatch.length - prefixLength;
-      }
-      editor.setSelection(
-        { line: target.line, ch: startCh },
-        { line: target.line, ch: endCh }
-      );
+      const beforeComment = content.substring(0, target.startPos);
+      const startLine = (beforeComment.match(/\n/g) || []).length;
+      const startLineContent = content.split("\n")[startLine];
+      const commentStartInLine = beforeComment.length - beforeComment.lastIndexOf("\n") - 1;
+      const prefixLength = this.settings.commentPrefix.length;
+      const cursorPos = {
+        line: startLine,
+        ch: commentStartInLine + prefixLength + (startLineContent.substring(commentStartInLine + prefixLength).match(/^\s*/) || [""])[0].length
+      };
+      editor.setCursor(cursorPos);
       editor.scrollIntoView(
-        { from: { line: target.line, ch: startCh }, to: { line: target.line, ch: endCh } },
+        { from: cursorPos, to: cursorPos },
         true
       );
       editor.focus();
@@ -759,15 +755,29 @@ var CommentsView = class extends import_obsidian.ItemView {
   createCommentElement(comment, container) {
     const commentEl = container.createEl("div", { cls: "comment-item" });
     const contentEl = commentEl.createEl("div", { cls: "comment-content" });
-    const textEl = contentEl.createEl("div", {
-      cls: "comment-text",
-      attr: { contenteditable: "true", spellcheck: "false" }
-    });
-    const currentSearchTerm = this.currentSearchTerm || "";
-    if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm)) {
-      textEl.innerHTML = this.highlightSearchText(comment.text || "(empty comment)", currentSearchTerm);
+    const isMultiLine = comment.text.includes("\n");
+    let textEl;
+    if (isMultiLine) {
+      textEl = contentEl.createEl("textarea", {
+        cls: "comment-text comment-textarea",
+        attr: {
+          spellcheck: "false",
+          rows: (comment.text.split("\n").length + 1).toString()
+        }
+      });
+      textEl.value = comment.text || "";
     } else {
+      textEl = contentEl.createEl("div", {
+        cls: "comment-text",
+        attr: { contenteditable: "true", spellcheck: "false" }
+      });
       textEl.textContent = comment.text || "(empty comment)";
+    }
+    const currentSearchTerm = this.currentSearchTerm || "";
+    if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
+      if (textEl.tagName === "DIV") {
+        textEl.innerHTML = this.highlightSearchText(comment.text || "(empty comment)", currentSearchTerm);
+      }
     }
     const lineEl = contentEl.createEl("div", {
       text: `Line ${comment.line + 1}`,
@@ -791,29 +801,48 @@ var CommentsView = class extends import_obsidian.ItemView {
     });
     let originalText = comment.text;
     let isEditing = false;
-    textEl.addEventListener("input", () => {
+    const handleInput = () => {
       if (!isEditing) {
         isEditing = true;
         saveBtn.style.display = "inline-block";
         cancelBtn.style.display = "inline-block";
         deleteBtn.style.display = "none";
         commentEl.addClass("comment-editing");
-        textEl.innerHTML = "";
-        textEl.textContent = originalText;
       }
-    });
-    textEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
+    };
+    if (textEl.tagName === "TEXTAREA") {
+      textEl.addEventListener("input", handleInput);
+      const autoResize = () => {
+        const textarea = textEl;
+        textarea.style.height = "auto";
+        textarea.style.height = textarea.scrollHeight + "px";
+      };
+      textEl.addEventListener("input", autoResize);
+      setTimeout(autoResize, 0);
+    } else {
+      textEl.addEventListener("input", handleInput);
+    }
+    const handleKeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey && textEl.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        saveComment();
+      } else if (e.key === "Enter" && e.ctrlKey && textEl.tagName === "TEXTAREA") {
         e.preventDefault();
         saveComment();
       } else if (e.key === "Escape") {
         e.preventDefault();
         cancelEdit();
       }
-    });
+    };
+    textEl.addEventListener("keydown", handleKeydown);
     const saveComment = () => {
       var _a;
-      const newText = ((_a = textEl.textContent) == null ? void 0 : _a.trim()) || "";
+      let newText;
+      if (textEl.tagName === "TEXTAREA") {
+        newText = textEl.value.trim();
+      } else {
+        newText = ((_a = textEl.textContent) == null ? void 0 : _a.trim()) || "";
+      }
       if (newText !== originalText) {
         this.updateCommentInEditor(comment, newText);
         originalText = newText;
@@ -821,10 +850,14 @@ var CommentsView = class extends import_obsidian.ItemView {
       exitEditMode();
     };
     const cancelEdit = () => {
-      if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
-        textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+      if (textEl.tagName === "TEXTAREA") {
+        textEl.value = originalText;
       } else {
-        textEl.textContent = originalText;
+        if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
+          textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+        } else {
+          textEl.textContent = originalText;
+        }
       }
       exitEditMode();
     };
@@ -848,7 +881,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       e.stopPropagation();
       const confirmDelete = confirm(`Are you sure you want to delete this comment?
 
-"${comment.text}"`);
+"${comment.text.length > 100 ? comment.text.substring(0, 100) + "..." : comment.text}"`);
       if (confirmDelete) {
         this.deleteCommentFromEditor(comment);
       }
@@ -871,12 +904,16 @@ var CommentsView = class extends import_obsidian.ItemView {
         deleteBtn.style.display = "none";
         commentEl.addClass("comment-editing");
         textEl.focus();
-        const range = document.createRange();
-        range.selectNodeContents(textEl);
-        const selection = window.getSelection();
-        if (selection) {
-          selection.removeAllRanges();
-          selection.addRange(range);
+        if (textEl.tagName === "TEXTAREA") {
+          textEl.select();
+        } else {
+          const range = document.createRange();
+          range.selectNodeContents(textEl);
+          const selection = window.getSelection();
+          if (selection) {
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
         }
         return;
       }
@@ -1011,14 +1048,9 @@ var CommentsView = class extends import_obsidian.ItemView {
       return;
     }
     this.debug("Deleting comment at positions", matchingComment.startPos, "-", matchingComment.endPos);
-    const lines = currentContent.split("\n");
-    const commentLine = lines[matchingComment.line];
-    this.debug("Original line:", commentLine);
-    const commentPattern = new RegExp(this.plugin.escapeRegex(matchingComment.fullMatch), "g");
-    const cleanedLine = commentLine.replace(commentPattern, "");
-    this.debug("Cleaned line:", cleanedLine);
-    lines[matchingComment.line] = cleanedLine;
-    const newContent = lines.join("\n");
+    const beforeComment = currentContent.substring(0, matchingComment.startPos);
+    const afterComment = currentContent.substring(matchingComment.endPos);
+    const newContent = beforeComment + afterComment;
     const finalContent = newContent.replace(/  +/g, " ");
     editor.setValue(finalContent);
     new import_obsidian.Notice("Comment deleted");

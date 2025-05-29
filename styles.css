@@ -963,3 +963,54 @@ available in the app when your plugin is enabled.
 		display: none;
 	}
 }
+
+/* Additional CSS styles for multi-line comment support */
+/* Add these to your existing styles.css file */
+
+.comment-textarea {
+	width: 100%;
+	min-height: 60px;
+	resize: vertical;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+	padding: 4px 6px;
+	font-family: var(--font-text);
+	font-size: 14px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	background-color: var(--background-primary);
+	transition: border-color 0.1s ease;
+}
+
+.comment-textarea:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	background-color: var(--background-primary);
+}
+
+.comment-editing .comment-textarea {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-form-field);
+}
+
+/* Ensure textarea doesn't break the layout */
+.comment-text.comment-textarea {
+	margin-bottom: 4px;
+	box-sizing: border-box;
+}
+
+/* Style for multi-line comment display when not editing */
+.comment-text {
+	white-space: pre-wrap; /* Preserve line breaks in display */
+	word-wrap: break-word;
+}
+
+/* Adjust comment item padding for better multi-line display */
+.comment-item {
+	padding: 10px 12px; /* Slightly more padding for multi-line content */
+}
+
+/* Better spacing for multi-line content */
+.comment-content {
+	line-height: 1.5; /* Improved line height for readability */
+}
