@@ -128,6 +128,8 @@ If you find this plugin helpful, consider:
 
 **Example Note**
 
+Comments color in the image below is controlled by a css snippet
+
 ![ocm-image-1](https://github.com/user-attachments/assets/df507278-c1da-4e32-83c4-c014d072b0e1)
 
 **Comments Panel-Expanded by Default**
