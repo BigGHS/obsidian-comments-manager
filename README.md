@@ -12,6 +12,8 @@ A powerful Obsidian plugin that helps you manage and navigate comments in your n
 - **⚡ Collapse/Expand**: Individual section control plus global expand/collapse toggle
 - **🎛️ Customizable**: Configure comment prefix, default view state, and startup behavior
 - **💾 State Preservation**: Maintains your manual expansions when navigating between comments
+- **🖨️ Print Mode**: Convert all comments to callouts for PDF export without permanently modifying your files
+- **📝 Individual Conversion**: Convert specific comments to permanent callouts with custom titles
 
 ## Installation
 
@@ -27,7 +29,7 @@ A powerful Obsidian plugin that helps you manage and navigate comments in your n
 
 1. Clone this repository into your vault's `.obsidian/plugins/` directory:
    ```bash
-   git clone https://github.com/yourusername/obsidian-comments-manager.git
+   git clone https://github.com/BigGHS/obsidian-comments-manager.git
    ```
 2. Navigate to the plugin directory:
    ```bash
@@ -63,10 +65,50 @@ You can customize the comment prefix in the plugin settings.
 
 ### Panel Controls
 
+- **🖨️ Print Mode Button**: Convert all comments to callouts for PDF export
 - **Toggle Button** (`+`/`-`): Expand or collapse all sections globally
 - **Section Icons** (`▶`/`▼`): Expand or collapse individual sections
 - **Search Box**: Filter comments in real-time
-- **Comment Actions**: Save, Cancel, or Delete when editing
+- **Comment Actions**: Save, Cancel, Convert (📝), or Delete when managing comments
+
+### Print Mode
+
+Print Mode allows you to temporarily convert hidden comments to visible callouts for PDF export without permanently modifying your files.
+
+#### How to Use Print Mode:
+
+1. **Click the 🖨️ button** in the Comments panel or use the command "Activate Print Mode"
+2. **Preview** how your document will look with comments converted to callouts
+3. **Click "Export to PDF"** to trigger PDF export with converted comments
+4. **Your original document remains unchanged** - comments are converted temporarily
+5. **Click the restoration notice** when you're done to restore the original content
+
+#### Print Mode Features:
+
+- **Safe Operation**: No permanent file modification
+- **Preview Modal**: See exactly how comments will appear as callouts
+- **Context Awareness**: Callouts include header context and line numbers
+- **Manual Control**: You decide when to restore the original content
+- **Perfect for**: Academic papers, document reviews, sharing annotated content
+
+### Individual Comment Conversion
+
+Convert specific comments to permanent callouts with custom titles.
+
+#### How to Convert Individual Comments:
+
+1. **Click the 📝 button** next to any comment in the panel
+2. **Enter a custom title** for the callout (or leave blank for "Comment")
+3. **Confirm the conversion** - this permanently replaces the comment with a callout
+4. **The comment becomes visible** in both the editor and exported documents
+
+#### Conversion Features:
+
+- **Custom Titles**: Name your callouts with meaningful titles like "Important Note", "Question", "TODO"
+- **Permanent Change**: Unlike Print Mode, these conversions are saved to your file
+- **Smart Defaults**: If no title is provided, uses "Comment" or context from nearby headers
+- **Confirmation Dialog**: Prevents accidental conversions
+- **Perfect for**: Making specific feedback visible, highlighting important notes, creating actionable items
 
 ### Navigation Behavior
 
@@ -79,10 +121,41 @@ You can customize the comment prefix in the plugin settings.
 
 Access settings via Settings → Comments Manager:
 
+### General Settings
 - **Comment Prefix**: Characters used to mark comments (default: `%%`)
 - **Open Panel on Startup**: Automatically open the comments panel when Obsidian starts
 - **Default Collapsed View**: Start with the panel in collapsed state (showing only headers)
 - **Debug Mode**: Enable console logging for troubleshooting
+
+### Print Mode Settings
+- **Callout Type for Print Mode**: The type of callout to use when converting comments (e.g., comment, note, info)
+- **Include Comment Author**: Include author information in converted callouts (placeholder for future feature)
+- **Include Comment Timestamp**: Include timestamp information in converted callouts (placeholder for future feature)
+
+## Commands
+
+The plugin adds several commands accessible via the command palette (`Ctrl+P`):
+
+- **Toggle Comments Panel**: Open/close the comments side panel
+- **Insert Comment**: Add a new comment at the cursor position
+- **Activate Print Mode**: Convert all comments to callouts for PDF export
+
+## Use Cases
+
+### Academic Writing
+- **Hidden Comments**: Keep research notes and citations as hidden comments during writing
+- **Print Mode**: Convert to visible callouts when sharing with supervisors or for final submission
+- **Individual Conversion**: Make specific references permanent while keeping others hidden
+
+### Document Review
+- **Collaborative Feedback**: Use comments for suggestions and questions
+- **Print Mode**: Generate PDFs with all feedback visible for distribution
+- **Selective Visibility**: Convert critical feedback to permanent callouts
+
+### Project Documentation
+- **Development Notes**: Keep implementation notes as hidden comments
+- **Client Presentations**: Use Print Mode to show relevant comments in client-facing documents
+- **Action Items**: Convert specific comments to permanent "TODO" callouts
 
 ## Development
 
@@ -158,6 +231,17 @@ Comments color in the image below is controlled by a css snippet
 
 ## Changelog
 
+### Version 1.2.0
+- **🖨️ Print Mode**: Convert all comments to callouts for PDF export without permanently modifying files
+- **📝 Individual Comment Conversion**: Convert specific comments to permanent callouts with custom titles
+- **🎨 Enhanced UI**: Added Print Mode button and conversion modal with professional styling
+- **⚙️ Print Mode Settings**: Configurable callout types and future options for author/timestamp inclusion
+- **🔧 Improved Reliability**: Better view detection and error handling for edge cases
+- **📖 Enhanced Documentation**: Comprehensive README with use cases and detailed feature explanations
+
+### Version 1.1.0
+- Amended code to allow for multi-line comments where the comment start and ending markers (default "%%") are on different lines
+
 ### Version 1.0.0
 - Initial release
 - Side panel with hierarchical comment organization
@@ -165,10 +249,3 @@ Comments color in the image below is controlled by a css snippet
 - In-panel and in-document editing
 - Customizable settings
 - State preservation for manual expansions
-
-### Version 1.1.0
-<<<<<<< HEAD
-- Amended code to allow for multi-line comments where the comments start and ending markers (default "%%") are on different lines
-
-=======
-- Amended code to allow for multi-line comments where the comment start and ending markers (default "%%") are on different lines

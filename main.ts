@@ -77,12 +77,14 @@ class PrintModePreviewModal extends Modal {
 	plugin: CommentsManagerPlugin;
 	originalContent: string;
 	convertedContent: string;
+	activeView: MarkdownView; // Store the active view reference
 	
-	constructor(app: App, plugin: CommentsManagerPlugin, originalContent: string, convertedContent: string) {
+	constructor(app: App, plugin: CommentsManagerPlugin, originalContent: string, convertedContent: string, activeView: MarkdownView) {
 		super(app);
 		this.plugin = plugin;
 		this.originalContent = originalContent;
 		this.convertedContent = convertedContent;
+		this.activeView = activeView; // Store the view reference
 	}
 
 	onOpen() {
@@ -133,43 +135,160 @@ class PrintModePreviewModal extends Modal {
 	}
 
 	async triggerPDFExport() {
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView) {
-			new Notice('No active markdown view found');
-			return;
-		}
-
-		// Temporarily replace content
-		const editor = activeView.editor;
-		const originalContent = editor.getValue();
-		
-		try {
-			// Set converted content
-			editor.setValue(this.convertedContent);
-			
-			// Brief pause to ensure content is rendered
-			await new Promise(resolve => setTimeout(resolve, 100));
-			
-			// Trigger PDF export command
-			const pdfCommand = this.app.commands.commands['editor:export-pdf'];
-			if (pdfCommand) {
-				await pdfCommand.callback();
-				new Notice('PDF export initiated with comments as callouts');
-			} else {
-				// Fallback to print dialog
-				window.print();
-				new Notice('Print dialog opened with comments as callouts');
+			if (!this.activeView) {
+				new Notice('No active markdown view available');
+				return;
 			}
+
+			const editor = this.activeView.editor;
+			if (!editor) {
+				new Notice('Editor is no longer available');
+				return;
+			}
+		
+			const originalContent = editor.getValue();
+		
+			try {
+				// Close modal first
+				this.close();
+				await new Promise(resolve => setTimeout(resolve, 200));
 			
-			// Wait a bit before restoring content
-			await new Promise(resolve => setTimeout(resolve, 1000));
+				// Focus the editor
+				this.activeView.editor.focus();
 			
-		} finally {
-			// Restore original content
-			editor.setValue(originalContent);
-			new Notice('Original content restored');
-			this.close();
+				// Set converted content
+				editor.setValue(this.convertedContent);
+				editor.refresh();
+			
+				// Give time for rendering
+				await new Promise(resolve => setTimeout(resolve, 800));
+			
+				// Create a notice with restore function
+				const restoreContent = () => {
+					editor.setValue(originalContent);
+					editor.refresh();
+					new Notice('Original content restored');
+				};
+			
+				// Show persistent notice with restore option
+				const notice = new Notice('Document converted to callouts! Now use Ctrl+P or File → Export to PDF. Click here when done to restore original content.', 0);
+				notice.noticeEl.style.cursor = 'pointer';
+				notice.noticeEl.addEventListener('click', () => {
+					restoreContent();
+					notice.hide();
+				});
+			
+				// Also add a command to restore content
+				const restoreCommand = this.plugin.addCommand({
+					id: 'restore-original-content',
+					name: 'Restore Original Content (after Print Mode)',
+					callback: () => {
+						restoreContent();
+						notice.hide();
+						// Remove this temporary command
+						(this.plugin as any).removeCommand('restore-original-content');
+					}
+				});
+			
+			} catch (error) {
+				console.error('Error during PDF export preparation:', error);
+				new Notice('Error preparing for PDF export: ' + error.message);
+				// Restore content on error
+				try {
+					editor.setValue(originalContent);
+					editor.refresh();
+				} catch (restoreError) {
+					console.error('Error restoring content:', restoreError);
+				}
+			}
 		}
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+// Comment Conversion Modal
+class CommentConversionModal extends Modal {
+	comment: CommentData;
+	onConfirm: (customTitle: string) => void;
+	
+	constructor(app: App, comment: CommentData, onConfirm: (customTitle: string) => void) {
+		super(app);
+		this.comment = comment;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// Title
+		contentEl.createEl('h2', { text: 'Convert Comment to Callout' });
+
+		// Comment preview
+		const previewContainer = contentEl.createEl('div', { cls: 'conversion-modal-preview' });
+		previewContainer.createEl('h4', { text: 'Comment:' });
+		const commentPreview = previewContainer.createEl('div', { cls: 'conversion-modal-comment' });
+		commentPreview.textContent = this.comment.text.length > 200 ? 
+			this.comment.text.substring(0, 200) + '...' : 
+			this.comment.text;
+
+		// Custom title input
+		const titleContainer = contentEl.createEl('div', { cls: 'conversion-modal-title-container' });
+		titleContainer.createEl('label', { 
+			text: 'Callout Title (leave blank for "Comment"):',
+			cls: 'conversion-modal-label'
+		});
+		
+		const titleInput = titleContainer.createEl('input', {
+			type: 'text',
+			cls: 'conversion-modal-input',
+			attr: { 
+				placeholder: 'e.g., "Important Note", "Question", "Suggestion"...',
+				spellcheck: 'false'
+			}
+		});
+
+		// Info text
+		const infoEl = contentEl.createEl('p', { cls: 'conversion-modal-info' });
+		infoEl.innerHTML = '<strong>Note:</strong> This will permanently replace the comment with a visible callout. This action cannot be undone.';
+
+		// Buttons
+		const buttonContainer = contentEl.createEl('div', { cls: 'conversion-modal-buttons' });
+		
+		const convertBtn = buttonContainer.createEl('button', { 
+			text: 'Convert to Callout', 
+			cls: 'mod-cta'
+		});
+		
+		const cancelBtn = buttonContainer.createEl('button', { 
+			text: 'Cancel'
+		});
+
+		// Event handlers
+		convertBtn.onclick = () => {
+			const customTitle = titleInput.value.trim();
+			this.onConfirm(customTitle);
+			this.close();
+		};
+
+		cancelBtn.onclick = () => {
+			this.close();
+		};
+
+		// Handle Enter key in input
+		titleInput.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				convertBtn.click();
+			} else if (e.key === 'Escape') {
+				e.preventDefault();
+				cancelBtn.click();
+			}
+		});
+
+		// Focus the input field
+		setTimeout(() => titleInput.focus(), 100);
 	}
 
 	onClose() {
@@ -263,24 +382,68 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 
 	activatePrintMode() {
-		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView) {
-			new Notice('No active markdown file found');
-			return;
-		}
-
-		const content = activeView.editor.getValue();
-		const convertedContent = this.convertCommentsToCallouts(content);
+			// Use the same robust view detection logic as the comments panel
+			let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			let currentFile = this.app.workspace.getActiveFile();
 		
-		if (convertedContent === content) {
-			new Notice('No comments found to convert');
-			return;
+			this.debug('Print Mode - Active view:', !!activeView, 'Current file:', !!currentFile);
+		
+			// If no active view but we have a current file, try to find the view for that file
+			if (!activeView && currentFile) {
+				const leaves = this.app.workspace.getLeavesOfType('markdown');
+				for (const leaf of leaves) {
+					const view = leaf.view as MarkdownView;
+					if (view.file === currentFile) {
+						activeView = view;
+						this.debug('Found view for current file in Print Mode');
+						break;
+					}
+				}
+			}
+		
+			// Also check the comments view's stored current file
+			const commentsLeaves = this.app.workspace.getLeavesOfType(COMMENTS_VIEW_TYPE);
+			if (!activeView && commentsLeaves.length > 0) {
+				const commentsView = commentsLeaves[0].view as CommentsView;
+				if ((commentsView as any).currentFile) {
+					currentFile = (commentsView as any).currentFile;
+					this.debug('Using stored current file from comments view');
+				
+					// Try to find the view for this stored file
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for stored file in Print Mode');
+							break;
+						}
+					}
+				}
+			}
+
+			if (!activeView) {
+				new Notice('No active markdown file found. Please open a markdown file first.');
+				return;
+			}
+
+			const content = activeView.editor.getValue();
+		
+			if (!content || content.trim().length === 0) {
+				new Notice('The current file is empty');
+				return;
+			}
+		
+			const convertedContent = this.convertCommentsToCallouts(content);
+		
+			if (convertedContent === content) {
+				new Notice('No comments found to convert');
+				return;
+			}
+
+			// Show preview modal - pass the activeView reference
+			new PrintModePreviewModal(this.app, this, content, convertedContent, activeView).open();
 		}
-
-		// Show preview modal
-		new PrintModePreviewModal(this.app, this, content, convertedContent).open();
-	}
-
 	convertCommentsToCallouts(content: string): string {
 		const comments = this.extractComments(content);
 		const headers = this.extractHeaders(content);
@@ -647,7 +810,7 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 }
 
-// Comments View Class (keeping the existing implementation with Print Mode button added)
+// Comments View Class
 class CommentsView extends ItemView {
 	plugin: CommentsManagerPlugin;
 	private currentFile: TFile | null = null;
@@ -916,9 +1079,6 @@ class CommentsView extends ItemView {
 		this.debug('Initial collapsed state:', this.isCollapsed, 'hasManualExpansions:', this.hasManualExpansions);
 	}
 
-	// ... (rest of the CommentsView methods remain the same as in the original)
-	// I'll include the key methods but truncate for space
-
 	private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
 		const restoreGroup = (group: CommentGroup) => {
 			if (group.header) {
@@ -958,19 +1118,8 @@ class CommentsView extends ItemView {
 
 	private highlightSearchText(text: string, searchTerm: string): string {
 		if (!searchTerm) return text;
-		
-		const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\	private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
-		const restoreGroup = (group: CommentGroup) => {
-			if (group.header) {
-				const key = `${group.header.level}-${group.header.text}`;
-				const wasExpanded = states.get(key);
-				if (wasExpanded !== undefined) {
-					group.isCollapsed = !wasExpanded;
-					
-					const rendered = this.renderedGroups.find(r => 
-						r.group.header && 
-						r.group.header.level === group.header!.level && 
-						r.group.header.text')})`, 'gi');
+	
+		const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
 		return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 	}
 
@@ -1245,24 +1394,43 @@ class CommentsView extends ItemView {
 			cls: 'comment-line' 
 		});
 
+		// Action buttons container
 		const actionsEl = commentEl.createEl('div', { cls: 'comment-actions' });
 		
+		// Save button (initially hidden)
 		const saveBtn = actionsEl.createEl('button', { 
 			text: 'Save', 
 			cls: 'comment-btn comment-save-btn' 
 		});
 		saveBtn.style.display = 'none';
 		
+		// Cancel button (initially hidden)
 		const cancelBtn = actionsEl.createEl('button', { 
 			text: 'Cancel', 
 			cls: 'comment-btn comment-cancel-btn' 
 		});
 		cancelBtn.style.display = 'none';
 
+		// Convert to Callout button
+		const convertBtn = actionsEl.createEl('button', { 
+			text: '📝', 
+			cls: 'comment-btn comment-convert-btn',
+			attr: { title: 'Convert to callout' }
+		});
+
+		// Delete button
 		const deleteBtn = actionsEl.createEl('button', { 
 			text: '×', 
 			cls: 'comment-btn comment-delete-btn',
 			attr: { title: 'Delete comment' }
+		});
+		convertBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			
+			// Open the conversion modal
+			new CommentConversionModal(this.app, comment, (customTitle: string) => {
+			  this.convertCommentToCallout(comment, customTitle);
+			}).open();
 		});
 
 		let originalText = comment.text;
@@ -1583,6 +1751,131 @@ class CommentsView extends ItemView {
 			this.refresh();
 		}, 100);
 	}
+	convertCommentToCallout(comment: CommentData, customTitle?: string) {
+			this.debug('convertCommentToCallout called for:', comment, 'with title:', customTitle);
+		
+			// Use the same robust view detection as other methods
+			let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+			let currentFile = this.app.workspace.getActiveFile();
+		
+			this.debug('Convert - Active view:', !!activeView, 'Current file:', !!currentFile);
+		
+			if (!activeView && currentFile) {
+				const leaves = this.app.workspace.getLeavesOfType('markdown');
+				for (const leaf of leaves) {
+					const view = leaf.view as MarkdownView;
+					if (view.file === currentFile) {
+						activeView = view;
+						this.debug('Found view for current file in convert');
+						break;
+					}
+				}
+			}
+		
+			if (!activeView && this.currentFile) {
+				this.debug('Using stored current file for convert');
+				currentFile = this.currentFile;
+				const leaves = this.app.workspace.getLeavesOfType('markdown');
+				for (const leaf of leaves) {
+					const view = leaf.view as MarkdownView;
+					if (view.file === currentFile) {
+						activeView = view;
+						this.debug('Found view for stored file in convert');
+						break;
+					}
+				}
+			}
+		
+			if (!activeView) {
+				this.debug('No active view found for converting comment');
+				return;
+			}
+
+			const editor = activeView.editor;
+			const currentContent = editor.getValue();
+		
+			// Find the comment again in the current content to get fresh positions
+			const currentComments = this.plugin.extractComments(currentContent);
+			const matchingComment = currentComments.find(c => 
+				c.text === comment.text && 
+				c.line === comment.line
+			);
+		
+			if (!matchingComment) {
+				this.debug('Could not find matching comment to convert');
+				this.refresh();
+				return;
+			}
+		
+			// Extract headers for context
+			const headers = this.plugin.extractHeaders(currentContent);
+		
+			// Create the callout using the same logic as print mode but with custom title
+			const callout = this.createCalloutFromComment(matchingComment, headers, customTitle);
+		
+			this.debug('Converting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
+			this.debug('Original comment:', matchingComment.fullMatch);
+			this.debug('New callout:', callout);
+		
+			// Get the content before and after the comment
+			const beforeComment = currentContent.substring(0, matchingComment.startPos);
+			const afterComment = currentContent.substring(matchingComment.endPos);
+		
+			// Replace comment with callout
+			const newContent = beforeComment + callout + afterComment;
+		
+			editor.setValue(newContent);
+			editor.refresh();
+		
+			// Show success message
+			const titleText = customTitle ? `"${customTitle}"` : 'callout';
+			new Notice(`Comment converted to ${titleText}`);
+		
+			// Refresh the view
+			setTimeout(() => {
+				this.debug('Refreshing view after comment conversion');
+				this.refresh();
+			}, 100);
+		}
+
+		private createCalloutFromComment(comment: CommentData, headers: HeaderData[], customTitle?: string): string {
+			const calloutType = this.plugin.settings.printModeCalloutType;
+		
+			// Use custom title if provided, otherwise generate default
+			let title: string;
+			if (customTitle && customTitle.trim().length > 0) {
+				title = customTitle.trim();
+			} else {
+				// Find the nearest header for context (original logic)
+				let nearestHeader: HeaderData | null = null;
+				for (let i = headers.length - 1; i >= 0; i--) {
+					if (headers[i].line < comment.line) {
+						nearestHeader = headers[i];
+						break;
+					}
+				}
+
+				title = 'Comment';
+				if (nearestHeader) {
+					title = `Comment: ${nearestHeader.text}`;
+				}
+			
+				// Add line number for reference
+				title += ` (Line ${comment.line + 1})`;
+			}
+
+			// Format comment text for callout
+			const commentText = comment.text
+				.split('\n')
+				.map(line => line.trim())
+				.filter(line => line.length > 0)
+				.join('\n> ');
+
+			// Create the callout
+			let callout = `\n> [!${calloutType}]+ ${title}\n> ${commentText}\n`;
+
+			return callout;
+		}
 }
 
 // Settings tab class with Print Mode settings
