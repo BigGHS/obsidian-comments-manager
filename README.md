@@ -124,6 +124,38 @@ If you find this plugin helpful, consider:
 - 🐛 Reporting bugs or requesting features in the Issues section
 - 💡 Contributing improvements
 
+## Images
+
+**Example Note**
+
+Comments color in the image below is controlled by a css snippet
+
+![ocm-image-1](https://github.com/user-attachments/assets/df507278-c1da-4e32-83c4-c014d072b0e1)
+
+**Comments Panel-Expanded by Default**
+
+![ocm-image-2](https://github.com/user-attachments/assets/2d9d1355-ca0c-48cc-b3a9-604e56f8de03)
+
+**Comments Panel-Collapsed**
+
+![ocm-image-3](https://github.com/user-attachments/assets/b7d1f21e-0e1d-44ca-9be0-bc7379c2f463)
+
+**Comments Panel-Manually Expanded**
+
+![ocm-image-4](https://github.com/user-attachments/assets/6647de02-2b54-4fae-aae7-872fda07965e)
+
+**Comments Panel-Edit Comment in Side Panel**
+
+![ocm-image-5](https://github.com/user-attachments/assets/63a38a4d-994e-4e40-85df-3f81ac52f89d)
+
+**Reading View**
+
+![ocm-image-6](https://github.com/user-attachments/assets/d6edad67-d087-48a1-b88e-8f78e6ff5334)
+
+**Export to pdf**
+
+![ocm-image-7](https://github.com/user-attachments/assets/55958ce0-e9ad-4c96-8d10-1f8e97f7cb7e)
+
 ## Changelog
 
 ### Version 1.0.0
@@ -135,5 +167,8 @@ If you find this plugin helpful, consider:
 - State preservation for manual expansions
 
 ### Version 1.1.0
+<<<<<<< HEAD
 - Amended code to allow for multi-line comments where the comments start and ending markers (default "%%") are on different lines
 
+=======
+- Amended code to allow for multi-line comments where the comment start and ending markers (default "%%") are on different lines
