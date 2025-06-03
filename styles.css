@@ -1,8 +1,5 @@
 /*
-
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
-
+Comments Manager Beta - Enhanced with Print Mode functionality
 */
 
 /* Panel Styles */
@@ -50,12 +47,10 @@ available in the app when your plugin is enabled.
 }
 
 .comment-header-virtual {
-	/* Hide virtual/intermediate headers completely */
 	display: none !important;
 }
 
 .comment-header-virtual:hover {
-	/* Also hide the hover state */
 	display: none !important;
 }
 
@@ -93,7 +88,7 @@ available in the app when your plugin is enabled.
 
 /* Individual Comment Styles */
 .comment-item {
-	padding: 8px 12px;
+	padding: 10px 12px;
 	margin: 2px 0;
 	border-radius: 4px;
 	cursor: pointer;
@@ -115,7 +110,7 @@ available in the app when your plugin is enabled.
 }
 
 .comment-content {
-	line-height: 1.4;
+	line-height: 1.5;
 	margin-bottom: 8px;
 }
 
@@ -127,11 +122,39 @@ available in the app when your plugin is enabled.
 	border-radius: 3px;
 	padding: 2px 4px;
 	min-height: 20px;
+	white-space: pre-wrap;
 }
 
 .comment-text[contenteditable="true"]:focus {
 	outline: 1px solid var(--interactive-accent);
 	background-color: var(--background-primary);
+}
+
+.comment-textarea {
+	width: 100%;
+	min-height: 60px;
+	resize: vertical;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 3px;
+	padding: 4px 6px;
+	font-family: var(--font-text);
+	font-size: 14px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	background-color: var(--background-primary);
+	transition: border-color 0.1s ease;
+	box-sizing: border-box;
+}
+
+.comment-textarea:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+	background-color: var(--background-primary);
+}
+
+.comment-editing .comment-textarea {
+	border-color: var(--interactive-accent);
+	background-color: var(--background-modifier-form-field);
 }
 
 .comment-line {
@@ -192,255 +215,7 @@ available in the app when your plugin is enabled.
 	border-color: var(--text-error);
 }
 
-/* Additional styles for collapse/expand buttons - add these to your existing styles.css */
-
-.comments-title-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 8px;
-}
-
-.comments-controls {
-	display: flex;
-	gap: 4px;
-}
-
-.comments-control-btn {
-	padding: 2px 8px;
-	font-size: 11px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	white-space: nowrap;
-}
-
-.comments-control-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-control-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-control-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 4px;
-	}
-	
-	.comments-controls {
-		align-self: flex-end;
-	}
-}
-
-/* Additional styles for collapse/expand toggle button - add these to your existing styles.css */
-
-.comments-title-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 8px;
-}
-
-.comments-controls {
-	display: flex;
-	gap: 4px;
-}
-
-.comments-toggle-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-}
-
-.comments-toggle-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-toggle-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-toggle-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-.comments-toggle-icon {
-	font-size: 12px;
-	line-height: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-}
-
-/* Legacy styles for the old buttons - can be removed if not needed */
-.comments-control-btn {
-	padding: 2px 8px;
-	font-size: 11px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	white-space: nowrap;
-}
-
-.comments-control-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-control-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-control-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 4px;
-	}
-	
-	.comments-controls {
-		align-self: flex-end;
-	}
-}
-
-/* Additional styles for collapse/expand toggle button - add these to your existing styles.css */
-
-.comments-title-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 8px;
-}
-
-.comments-controls {
-	display: flex;
-	gap: 4px;
-}
-
-.comments-toggle-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 32px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-}
-
-.comments-toggle-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-toggle-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-toggle-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-.comments-toggle-icon {
-	font-size: 11px;
-	font-family: var(--font-monospace);
-	font-weight: bold;
-	line-height: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-muted);
-}
-
-.comments-toggle-btn:hover .comments-toggle-icon {
-	color: var(--text-normal);
-}
-
-/* Legacy styles for the old buttons - can be removed if not needed */
-.comments-control-btn {
-	padding: 2px 8px;
-	font-size: 11px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	white-space: nowrap;
-}
-
-.comments-control-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-control-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-control-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 4px;
-	}
-	
-	.comments-controls {
-		align-self: flex-end;
-	}
-}
-
-/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
-
+/* Title Row and Controls */
 .comments-title-row {
 	display: flex;
 	justify-content: space-between;
@@ -453,176 +228,46 @@ available in the app when your plugin is enabled.
 	text-align: left;
 }
 
-.comments-toggle-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 32px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	margin: 0 auto; /* Center the button */
-}
-
-.comments-spacer {
-	flex: 1;
-}
-
-.comments-toggle-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-toggle-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-toggle-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-.comments-toggle-icon {
-	font-size: 11px;
-	font-family: var(--font-monospace);
-	font-weight: bold;
-	line-height: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-muted);
-}
-
-.comments-toggle-btn:hover .comments-toggle-icon {
-	color: var(--text-normal);
-}
-
-/* Search functionality styles */
-.comments-search-container {
-	position: relative;
-	margin-bottom: 8px;
-}
-
-.comments-search-input {
-	width: 100%;
-	padding: 6px 30px 6px 8px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
-	color: var(--text-normal);
-	border-radius: 4px;
-	font-size: 13px;
-	transition: border-color 0.1s ease;
-}
-
-.comments-search-input:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-}
-
-.comments-search-input:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-search-input::placeholder {
-	color: var(--text-muted);
-}
-
-.comments-clear-search {
-	position: absolute;
-	right: 4px;
-	top: 50%;
-	transform: translateY(-50%);
-	width: 20px;
-	height: 20px;
-	border: none;
-	background: none;
-	color: var(--text-muted);
-	cursor: pointer;
-	border-radius: 2px;
-	font-size: 14px;
-	font-weight: bold;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.1s ease;
-}
-
-.comments-clear-search:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-/* Legacy styles for the old buttons - can be removed if not needed */
 .comments-controls {
 	display: flex;
 	gap: 4px;
+	align-items: center;
 }
 
-.comments-control-btn {
-	padding: 2px 8px;
-	font-size: 11px;
+/* Print Mode Button Styles */
+.print-mode-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 24px;
+	padding: 0;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
 	color: var(--text-normal);
-	border-radius: 3px;
+	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.1s ease;
-	white-space: nowrap;
+	font-size: 14px;
 }
 
-.comments-control-btn:hover:not(:disabled) {
+.print-mode-btn:hover:not(:disabled) {
 	background: var(--background-modifier-hover);
 	border-color: var(--interactive-accent);
+	transform: translateY(-1px);
 }
 
-.comments-control-btn:disabled {
+.print-mode-btn:disabled {
 	opacity: 0.5;
 	cursor: not-allowed;
 }
 
-.comments-control-btn:active:not(:disabled) {
+.print-mode-btn:active:not(:disabled) {
 	background: var(--background-modifier-active);
 	transform: translateY(1px);
 }
 
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-	}
-	
-	.comments-title {
-		text-align: center;
-	}
-	
-	.comments-spacer {
-		display: none;
-	}
-}
-
-/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
-
-.comments-title-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 8px;
-}
-
-.comments-title {
-	flex: 1;
-	text-align: left;
-}
-
+/* Toggle Button Styles */
 .comments-toggle-btn {
 	display: flex;
 	align-items: center;
@@ -636,188 +281,6 @@ available in the app when your plugin is enabled.
 	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.1s ease;
-	margin: 0 auto; /* Center the button */
-}
-
-.comments-spacer {
-	flex: 1;
-}
-
-.comments-toggle-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-toggle-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-toggle-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-.comments-toggle-icon {
-	font-size: 14px;
-	line-height: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--text-muted);
-}
-
-.comments-toggle-btn:hover .comments-toggle-icon {
-	color: var(--text-normal);
-}
-
-/* Search functionality styles */
-.comments-search-container {
-	position: relative;
-	margin-bottom: 8px;
-}
-
-.comments-search-input {
-	width: 100%;
-	padding: 6px 30px 6px 8px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-primary);
-	color: var(--text-normal);
-	border-radius: 4px;
-	font-size: 13px;
-	transition: border-color 0.1s ease;
-}
-
-.comments-search-input:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-}
-
-.comments-search-input:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-search-input::placeholder {
-	color: var(--text-muted);
-}
-
-.comments-clear-search {
-	position: absolute;
-	right: 4px;
-	top: 50%;
-	transform: translateY(-50%);
-	width: 20px;
-	height: 20px;
-	border: none;
-	background: none;
-	color: var(--text-muted);
-	cursor: pointer;
-	border-radius: 2px;
-	font-size: 14px;
-	font-weight: bold;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.1s ease;
-}
-
-.comments-clear-search:hover {
-	background: var(--background-modifier-hover);
-	color: var(--text-normal);
-}
-
-/* Search highlighting styles */
-.search-highlight {
-	background-color: var(--text-highlight-bg);
-	color: var(--text-on-accent);
-	padding: 1px 2px;
-	border-radius: 2px;
-	font-weight: 500;
-}
-
-/* Legacy styles for the old buttons - can be removed if not needed */
-.comments-controls {
-	display: flex;
-	gap: 4px;
-}
-
-.comments-control-btn {
-	padding: 2px 8px;
-	font-size: 11px;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 3px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	white-space: nowrap;
-}
-
-.comments-control-btn:hover:not(:disabled) {
-	background: var(--background-modifier-hover);
-	border-color: var(--interactive-accent);
-}
-
-.comments-control-btn:disabled {
-	opacity: 0.5;
-	cursor: not-allowed;
-}
-
-.comments-control-btn:active:not(:disabled) {
-	background: var(--background-modifier-active);
-	transform: translateY(1px);
-}
-
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-	}
-	
-	.comments-title {
-		text-align: center;
-	}
-	
-	.comments-spacer {
-		display: none;
-	}
-}
-
-/* Additional styles for collapse/expand toggle button and search - add these to your existing styles.css */
-
-.comments-title-row {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	margin-bottom: 8px;
-}
-
-.comments-title {
-	flex: 1;
-	text-align: left;
-}
-
-.comments-toggle-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 32px;
-	height: 24px;
-	padding: 0;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-	border-radius: 4px;
-	cursor: pointer;
-	transition: all 0.1s ease;
-	margin: 0 auto; /* Center the button */
-}
-
-.comments-spacer {
-	flex: 1;
 }
 
 .comments-toggle-btn:hover:not(:disabled) {
@@ -914,12 +377,7 @@ available in the app when your plugin is enabled.
 	font-weight: 500;
 }
 
-/* Legacy styles for the old buttons - can be removed if not needed */
-.comments-controls {
-	display: flex;
-	gap: 4px;
-}
-
+/* Legacy control button styles */
 .comments-control-btn {
 	padding: 2px 8px;
 	font-size: 11px;
@@ -947,6 +405,101 @@ available in the app when your plugin is enabled.
 	transform: translateY(1px);
 }
 
+/* Print Mode Modal Styles */
+.print-mode-description {
+	margin-bottom: 16px;
+	padding: 12px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border-left: 4px solid var(--interactive-accent);
+	color: var(--text-normal);
+	line-height: 1.4;
+}
+
+.print-mode-preview-container {
+	max-height: 400px;
+	overflow-y: auto;
+	margin-bottom: 16px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	background-color: var(--background-primary);
+}
+
+.print-mode-preview {
+	margin: 0;
+	padding: 16px;
+	font-family: var(--font-monospace);
+	font-size: 13px;
+	line-height: 1.4;
+	color: var(--text-normal);
+	white-space: pre-wrap;
+	word-wrap: break-word;
+	background: transparent;
+}
+
+.print-mode-buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+	padding-top: 16px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.print-mode-buttons button {
+	padding: 8px 16px;
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+	cursor: pointer;
+	transition: all 0.1s ease;
+	font-size: 14px;
+}
+
+.print-mode-buttons button.mod-cta {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: var(--interactive-accent);
+}
+
+.print-mode-buttons button.mod-cta:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.print-mode-buttons button:not(.mod-cta) {
+	background-color: var(--background-secondary);
+	color: var(--text-normal);
+}
+
+.print-mode-buttons button:not(.mod-cta):hover {
+	background-color: var(--background-modifier-hover);
+}
+
+/* Settings Instructions Styles */
+.print-mode-instructions {
+	margin-top: 24px;
+	padding: 16px;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+	border-left: 4px solid var(--color-green);
+}
+
+.print-mode-instructions h4 {
+	margin: 0 0 12px 0;
+	color: var(--text-normal);
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.print-mode-instructions ol {
+	margin: 0;
+	padding-left: 20px;
+	color: var(--text-normal);
+}
+
+.print-mode-instructions li {
+	margin-bottom: 6px;
+	line-height: 1.4;
+}
+
 /* Responsive adjustments for smaller screens */
 @media (max-width: 300px) {
 	.comments-title-row {
@@ -959,58 +512,43 @@ available in the app when your plugin is enabled.
 		text-align: center;
 	}
 	
-	.comments-spacer {
-		display: none;
+	.comments-controls {
+		justify-content: center;
+	}
+	
+	.print-mode-buttons {
+		flex-direction: column;
+	}
+	
+	.print-mode-buttons button {
+		width: 100%;
 	}
 }
 
-/* Additional CSS styles for multi-line comment support */
-/* Add these to your existing styles.css file */
-
-.comment-textarea {
-	width: 100%;
-	min-height: 60px;
-	resize: vertical;
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 3px;
-	padding: 4px 6px;
-	font-family: var(--font-text);
-	font-size: 14px;
-	line-height: 1.4;
-	color: var(--text-normal);
-	background-color: var(--background-primary);
-	transition: border-color 0.1s ease;
+/* Hover effects for better UX */
+.print-mode-btn:hover {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.comment-textarea:focus {
-	outline: none;
-	border-color: var(--interactive-accent);
-	background-color: var(--background-primary);
+.comments-toggle-btn:hover {
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.comment-editing .comment-textarea {
-	border-color: var(--interactive-accent);
-	background-color: var(--background-modifier-form-field);
+/* Focus styles for accessibility */
+.print-mode-btn:focus,
+.comments-toggle-btn:focus,
+.comments-search-input:focus {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
 }
 
-/* Ensure textarea doesn't break the layout */
-.comment-text.comment-textarea {
-	margin-bottom: 4px;
-	box-sizing: border-box;
+/* Animation for the print mode button */
+@keyframes printPulse {
+	0% { transform: scale(1); }
+	50% { transform: scale(1.05); }
+	100% { transform: scale(1); }
 }
 
-/* Style for multi-line comment display when not editing */
-.comment-text {
-	white-space: pre-wrap; /* Preserve line breaks in display */
-	word-wrap: break-word;
-}
-
-/* Adjust comment item padding for better multi-line display */
-.comment-item {
-	padding: 10px 12px; /* Slightly more padding for multi-line content */
-}
-
-/* Better spacing for multi-line content */
-.comment-content {
-	line-height: 1.5; /* Improved line height for readability */
+.print-mode-btn:active {
+	animation: printPulse 0.2s ease-in-out;
 }

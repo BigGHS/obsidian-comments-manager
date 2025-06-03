@@ -1,4 +1,4 @@
-// main.ts
+// main.ts - Beta version with Print Mode functionality
 import { 
 	App, 
 	Editor, 
@@ -10,7 +10,8 @@ import {
 	ItemView, 
 	TFile,
 	EditorPosition,
-	Notice
+	Notice,
+	Modal
 } from 'obsidian';
 
 // Plugin settings interface
@@ -19,13 +20,21 @@ interface CommentsManagerSettings {
 	openOnStart: boolean;
 	debugMode: boolean;
 	defaultCollapsed: boolean;
+	// Print Mode settings
+	printModeCalloutType: string;
+	includeCommentAuthor: boolean;
+	includeCommentTimestamp: boolean;
 }
 
 const DEFAULT_SETTINGS: CommentsManagerSettings = {
 	commentPrefix: '%%',
 	openOnStart: true,
 	debugMode: false,
-	defaultCollapsed: true
+	defaultCollapsed: true,
+	// Print Mode defaults
+	printModeCalloutType: 'comment',
+	includeCommentAuthor: false,
+	includeCommentTimestamp: false
 }
 
 // View type constant
@@ -63,10 +72,116 @@ interface RenderedGroup {
 	contentElement: HTMLElement;
 }
 
+// Print Mode Preview Modal
+class PrintModePreviewModal extends Modal {
+	plugin: CommentsManagerPlugin;
+	originalContent: string;
+	convertedContent: string;
+	
+	constructor(app: App, plugin: CommentsManagerPlugin, originalContent: string, convertedContent: string) {
+		super(app);
+		this.plugin = plugin;
+		this.originalContent = originalContent;
+		this.convertedContent = convertedContent;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// Title
+		contentEl.createEl('h2', { text: 'Print Mode Preview' });
+
+		// Description
+		const desc = contentEl.createEl('p', { cls: 'print-mode-description' });
+		desc.innerHTML = 'This preview shows how your document will look with comments converted to callouts for printing/PDF export. The original document will not be modified.';
+
+		// Content preview (scrollable)
+		const previewContainer = contentEl.createEl('div', { cls: 'print-mode-preview-container' });
+		const previewEl = previewContainer.createEl('pre', { cls: 'print-mode-preview' });
+		previewEl.textContent = this.convertedContent;
+
+		// Buttons
+		const buttonContainer = contentEl.createEl('div', { cls: 'print-mode-buttons' });
+		
+		const exportBtn = buttonContainer.createEl('button', { 
+			text: 'Export to PDF', 
+			cls: 'mod-cta'
+		});
+		
+		const copyBtn = buttonContainer.createEl('button', { 
+			text: 'Copy Content'
+		});
+		
+		const cancelBtn = buttonContainer.createEl('button', { 
+			text: 'Cancel'
+		});
+
+		// Button handlers
+		exportBtn.onclick = () => {
+			this.triggerPDFExport();
+		};
+
+		copyBtn.onclick = () => {
+			navigator.clipboard.writeText(this.convertedContent);
+			new Notice('Converted content copied to clipboard');
+		};
+
+		cancelBtn.onclick = () => {
+			this.close();
+		};
+	}
+
+	async triggerPDFExport() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView) {
+			new Notice('No active markdown view found');
+			return;
+		}
+
+		// Temporarily replace content
+		const editor = activeView.editor;
+		const originalContent = editor.getValue();
+		
+		try {
+			// Set converted content
+			editor.setValue(this.convertedContent);
+			
+			// Brief pause to ensure content is rendered
+			await new Promise(resolve => setTimeout(resolve, 100));
+			
+			// Trigger PDF export command
+			const pdfCommand = this.app.commands.commands['editor:export-pdf'];
+			if (pdfCommand) {
+				await pdfCommand.callback();
+				new Notice('PDF export initiated with comments as callouts');
+			} else {
+				// Fallback to print dialog
+				window.print();
+				new Notice('Print dialog opened with comments as callouts');
+			}
+			
+			// Wait a bit before restoring content
+			await new Promise(resolve => setTimeout(resolve, 1000));
+			
+		} finally {
+			// Restore original content
+			editor.setValue(originalContent);
+			new Notice('Original content restored');
+			this.close();
+		}
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
 export default class CommentsManagerPlugin extends Plugin {
 	settings: CommentsManagerSettings;
 	private refreshTimeout: number | null = null;
-	public skipNextRefresh: boolean = false; // Made public so CommentsView can access it
+	public skipNextRefresh: boolean = false;
 	private allHeaders: HeaderData[] = [];
 
 	private debug(message: string, ...args: any[]) {
@@ -112,6 +227,15 @@ export default class CommentsManagerPlugin extends Plugin {
 			}
 		});
 
+		// Add Print Mode command
+		this.addCommand({
+			id: 'activate-print-mode',
+			name: 'Activate Print Mode (Convert Comments to Callouts)',
+			callback: () => {
+				this.activatePrintMode();
+			}
+		});
+
 		// Add settings tab
 		this.addSettingTab(new CommentsManagerSettingTab(this.app, this));
 
@@ -138,12 +262,91 @@ export default class CommentsManagerPlugin extends Plugin {
 		}
 	}
 
+	activatePrintMode() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView) {
+			new Notice('No active markdown file found');
+			return;
+		}
+
+		const content = activeView.editor.getValue();
+		const convertedContent = this.convertCommentsToCallouts(content);
+		
+		if (convertedContent === content) {
+			new Notice('No comments found to convert');
+			return;
+		}
+
+		// Show preview modal
+		new PrintModePreviewModal(this.app, this, content, convertedContent).open();
+	}
+
+	convertCommentsToCallouts(content: string): string {
+		const comments = this.extractComments(content);
+		const headers = this.extractHeaders(content);
+		
+		if (comments.length === 0) {
+			return content;
+		}
+
+		// Work backwards through comments to maintain position integrity
+		let result = content;
+		const sortedComments = [...comments].sort((a, b) => b.startPos - a.startPos);
+		
+		for (const comment of sortedComments) {
+			const callout = this.createCalloutFromComment(comment, headers);
+			
+			// Replace comment with callout
+			const before = result.substring(0, comment.startPos);
+			const after = result.substring(comment.endPos);
+			
+			// Insert callout at the comment position
+			result = before + callout + after;
+		}
+
+		return result;
+	}
+
+	private createCalloutFromComment(comment: CommentData, headers: HeaderData[]): string {
+		const calloutType = this.settings.printModeCalloutType;
+		
+		// Find the nearest header for context
+		let nearestHeader: HeaderData | null = null;
+		for (let i = headers.length - 1; i >= 0; i--) {
+			if (headers[i].line < comment.line) {
+				nearestHeader = headers[i];
+				break;
+			}
+		}
+
+		// Create callout title
+		let title = 'Comment';
+		if (nearestHeader) {
+			title = `Comment: ${nearestHeader.text}`;
+		}
+
+		// Add line number for reference
+		title += ` (Line ${comment.line + 1})`;
+
+		// Format comment text for callout (escape any markdown that might interfere)
+		const commentText = comment.text
+			.split('\n')
+			.map(line => line.trim())
+			.filter(line => line.length > 0)
+			.join('\n> ');
+
+		// Create the callout
+		let callout = `\n> [!${calloutType}]+ ${title}\n> ${commentText}\n`;
+
+		return callout;
+	}
+
 	debounceRefresh() {
 		this.debug('debounceRefresh called, skipNextRefresh:', this.skipNextRefresh);
 		
 		if (this.skipNextRefresh) {
 			this.debug('Skipping refresh due to skipNextRefresh flag');
-			this.skipNextRefresh = false; // Reset the flag
+			this.skipNextRefresh = false;
 			return;
 		}
 		
@@ -163,18 +366,15 @@ export default class CommentsManagerPlugin extends Plugin {
 		const leaves = workspace.getLeavesOfType(COMMENTS_VIEW_TYPE);
 
 		if (leaves.length > 0) {
-			// If view exists, reveal it
 			leaf = leaves[0];
 			workspace.revealLeaf(leaf);
 		} else {
-			// Create new view in right sidebar
 			leaf = workspace.getRightLeaf(false);
 			if (leaf) {
 				await leaf.setViewState({ type: COMMENTS_VIEW_TYPE, active: true });
 			}
 		}
 
-		// Refresh the view content
 		this.refreshCommentsView();
 	}
 
@@ -191,8 +391,7 @@ export default class CommentsManagerPlugin extends Plugin {
 		const comments: CommentData[] = [];
 		const prefix = this.escapeRegex(this.settings.commentPrefix);
 		
-		// Create regex to match multi-line comments
-		const commentRegex = new RegExp(`${prefix}(.*?)${prefix}`, 'gs'); // 'g' for global, 's' for dotall (makes . match newlines)
+		const commentRegex = new RegExp(`${prefix}(.*?)${prefix}`, 'gs');
 		
 		let match;
 		while ((match = commentRegex.exec(content)) !== null) {
@@ -200,11 +399,9 @@ export default class CommentsManagerPlugin extends Plugin {
 			const endPos = match.index + match[0].length;
 			const commentText = match[1].trim();
 			
-			// Find which line the comment starts on
 			const beforeComment = content.substring(0, startPos);
 			const startLine = (beforeComment.match(/\n/g) || []).length;
 			
-			// Preserve line breaks in the comment text for display
 			comments.push({
 				text: commentText,
 				line: startLine,
@@ -237,17 +434,12 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 
 	groupCommentsByHeaders(comments: CommentData[], headers: HeaderData[]): CommentGroup[] {
-		// Store all headers for building complete hierarchy
 		this.allHeaders = headers;
 		
 		const groups: CommentGroup[] = [];
-		
-		// Sort headers by line number
 		const sortedHeaders = [...headers].sort((a, b) => a.line - b.line);
 		
-		// Group comments under their nearest preceding header
 		comments.forEach(comment => {
-			// Find the nearest preceding header
 			let nearestHeader: HeaderData | null = null;
 			
 			for (let i = sortedHeaders.length - 1; i >= 0; i--) {
@@ -257,7 +449,6 @@ export default class CommentsManagerPlugin extends Plugin {
 				}
 			}
 			
-			// Find or create the group for this header
 			let group = groups.find(g => 
 				(g.header === null && nearestHeader === null) ||
 				(g.header !== null && nearestHeader !== null && g.header.line === nearestHeader.line)
@@ -274,7 +465,6 @@ export default class CommentsManagerPlugin extends Plugin {
 			group.comments.push(comment);
 		});
 		
-		// Sort groups by header line number (null headers first)
 		groups.sort((a, b) => {
 			if (a.header === null && b.header === null) return 0;
 			if (a.header === null) return -1;
@@ -282,12 +472,10 @@ export default class CommentsManagerPlugin extends Plugin {
 			return a.header.line - b.header.line;
 		});
 		
-		// Build hierarchical structure including all headers (even those without comments)
 		return this.buildHierarchicalGroups(groups);
 	}
 
 	private buildHierarchicalGroups(flatGroups: CommentGroup[]): CommentGroup[] {
-		// Create a map of header line numbers to groups that have comments
 		const commentGroupsByHeaderLine = new Map<number, CommentGroup>();
 		let noHeaderGroup: CommentGroup | null = null;
 		
@@ -299,24 +487,19 @@ export default class CommentsManagerPlugin extends Plugin {
 			}
 		});
 		
-		// Create groups for ALL headers (like the outline does)
 		const allGroups: CommentGroup[] = [];
 		
-		// Add "No Header" group first if it exists
 		if (noHeaderGroup) {
 			allGroups.push(noHeaderGroup);
 		}
 		
-		// Process all headers in order - include ALL headers, not just those with comments
 		const sortedHeaders = this.allHeaders.sort((a: HeaderData, b: HeaderData) => a.line - b.line);
 		
 		sortedHeaders.forEach((header: HeaderData) => {
 			const existingGroup = commentGroupsByHeaderLine.get(header.line);
 			if (existingGroup) {
-				// Use existing group that has comments
 				allGroups.push(existingGroup);
 			} else {
-				// Create new group for header without comments - include ALL headers
 				allGroups.push({
 					header: header,
 					comments: []
@@ -324,24 +507,20 @@ export default class CommentsManagerPlugin extends Plugin {
 			}
 		});
 		
-		// Build hierarchical structure
 		const result: CommentGroup[] = [];
 		const stack: CommentGroup[] = [];
 		
 		for (const group of allGroups) {
 			if (!group.header) {
-				// "No Header" group always goes first
 				result.push(group);
 				continue;
 			}
 			
-			// Pop from stack until we find a proper parent (lower level number = higher level)
 			while (stack.length > 0 && stack[stack.length - 1].header!.level >= group.header.level) {
 				stack.pop();
 			}
 			
 			if (stack.length > 0) {
-				// This group has a parent - add it as a child
 				const parent = stack[stack.length - 1];
 				if (!parent.children) {
 					parent.children = [];
@@ -349,7 +528,6 @@ export default class CommentsManagerPlugin extends Plugin {
 				parent.children.push(group);
 				group.parent = parent;
 			} else {
-				// This is a top-level group
 				result.push(group);
 			}
 			
@@ -360,7 +538,6 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 	
 	private hasDescendantComments(header: HeaderData, commentGroupsByHeaderLine: Map<number, CommentGroup>): boolean {
-		// Check if any header that comes after this one and has a higher level (is a descendant) has comments
 		return this.allHeaders.some(otherHeader => 
 			otherHeader.line > header.line && 
 			otherHeader.level > header.level &&
@@ -389,14 +566,12 @@ export default class CommentsManagerPlugin extends Plugin {
 			const content = editor.getValue();
 			const comments = this.extractComments(content);
 			
-			// Try to find the exact comment first
 			let match = comments.find(c => 
 				c.text === comment.text && 
 				c.line === comment.line && 
 				c.startPos === comment.startPos
 			);
 			
-			// If not found, try to find by text and line with some tolerance
 			if (!match) {
 				match = comments.find(c => 
 					c.text === comment.text && 
@@ -404,38 +579,29 @@ export default class CommentsManagerPlugin extends Plugin {
 				);
 			}
 			
-			// If still not found, use the original comment data
 			const target = match || comment;
 			
 			this.debug('Found target comment:', target);
 
-			// For multi-line comments, position cursor at the start of the comment
 			const beforeComment = content.substring(0, target.startPos);
 			const startLine = (beforeComment.match(/\n/g) || []).length;
 			const startLineContent = content.split('\n')[startLine];
 			const commentStartInLine = beforeComment.length - beforeComment.lastIndexOf('\n') - 1;
 			
-			// Position cursor at the start of the comment (after the opening prefix)
 			const prefixLength = this.settings.commentPrefix.length;
 			const cursorPos = { 
 				line: startLine, 
 				ch: commentStartInLine + prefixLength + (startLineContent.substring(commentStartInLine + prefixLength).match(/^\s*/) || [''])[0].length
 			};
 			
-			// Set cursor position at the start of comment content
 			editor.setCursor(cursorPos);
-			
-			// Scroll the comment into view
 			editor.scrollIntoView(
 				{ from: cursorPos, to: cursorPos },
 				true
 			);
-			
-			// Focus the editor
 			editor.focus();
 		});
 
-		// Prevent the view from refreshing immediately after highlighting
 		this.debug('Setting skipNextRefresh to true');
 		this.skipNextRefresh = true;
 		setTimeout(() => {
@@ -481,18 +647,17 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 }
 
-// Comments View Class
+// Comments View Class (keeping the existing implementation with Print Mode button added)
 class CommentsView extends ItemView {
 	plugin: CommentsManagerPlugin;
 	private currentFile: TFile | null = null;
 	private renderedGroups: RenderedGroup[] = [];
-	private isCollapsed: boolean = false; // Will be set from settings
-	private hasManualExpansions: boolean = false; // Track if user manually expanded sections
+	private isCollapsed: boolean = false;
+	private hasManualExpansions: boolean = false;
 
 	constructor(leaf: WorkspaceLeaf, plugin: CommentsManagerPlugin) {
 		super(leaf);
 		this.plugin = plugin;
-		// Set initial state from plugin settings
 		this.isCollapsed = plugin.settings.defaultCollapsed;
 	}
 
@@ -535,19 +700,24 @@ class CommentsView extends ItemView {
 		const titleRow = header.createEl('div', { cls: 'comments-title-row' });
 		titleRow.createEl('h4', { text: 'Comments', cls: 'comments-title' });
 		
-		// Single toggle button for collapse/expand all (centered)
-		const toggleAllBtn = titleRow.createEl('button', { 
+		// Controls container
+		const controlsContainer = titleRow.createEl('div', { cls: 'comments-controls' });
+		
+		// Print Mode button
+		const printModeBtn = controlsContainer.createEl('button', { 
+			cls: 'comments-control-btn print-mode-btn',
+			attr: { title: 'Convert comments to callouts for printing' }
+		});
+		printModeBtn.innerHTML = '🖨️';
+		
+		// Toggle button for collapse/expand all
+		const toggleAllBtn = controlsContainer.createEl('button', { 
 			cls: 'comments-toggle-btn',
 			attr: { title: 'Toggle collapse/expand all sections' }
 		});
 		
-		// Add the icon - set based on current collapsed state
 		const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
-		// Icon should show what will happen when clicked
 		toggleIcon.innerHTML = this.isCollapsed ? '+' : '-';
-		
-		// Add empty spacer to balance the layout
-		const spacer = titleRow.createEl('div', { cls: 'comments-spacer' });
 		
 		// Add search container below the title row
 		const searchContainer = header.createEl('div', { cls: 'comments-search-container' });
@@ -560,7 +730,6 @@ class CommentsView extends ItemView {
 			}
 		});
 		
-		// Add clear search button
 		const clearSearchBtn = searchContainer.createEl('button', {
 			cls: 'comments-clear-search',
 			attr: { title: 'Clear search' }
@@ -571,13 +740,11 @@ class CommentsView extends ItemView {
 		setTimeout(() => {
 			this.debug('Executing delayed refresh check');
 			
-			// Try to get the active view, but also check for the current file
 			let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 			let currentFile = this.app.workspace.getActiveFile();
 			
 			this.debug('Active view:', !!activeView, 'Current file:', !!currentFile);
 			
-			// If no active view but we have a current file, try to find the view for that file
 			if (!activeView && currentFile) {
 				const leaves = this.app.workspace.getLeavesOfType('markdown');
 				for (const leaf of leaves) {
@@ -590,7 +757,6 @@ class CommentsView extends ItemView {
 				}
 			}
 			
-			// If we still don't have a view, but we have the current file stored, use that
 			if (!activeView && this.currentFile) {
 				this.debug('Using stored current file');
 				currentFile = this.currentFile;
@@ -603,12 +769,11 @@ class CommentsView extends ItemView {
 					cls: 'comments-empty' 
 				});
 				
-				// Disable button when no content
 				toggleAllBtn.disabled = true;
+				printModeBtn.disabled = true;
 				return;
 			}
 
-			// Store the current file for future reference
 			if (currentFile) {
 				this.currentFile = currentFile;
 			}
@@ -619,21 +784,19 @@ class CommentsView extends ItemView {
 			if (activeView) {
 				content = activeView.editor.getValue();
 				this.debug('Got content from active view');
-				this.processComments(content, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn);
+				this.processComments(content, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn);
 			} else if (currentFile) {
-				// If no active view, read from file (this shouldn't happen often, but is a fallback)
 				this.app.vault.read(currentFile).then(fileContent => {
 					this.debug('Got content from file read');
-					this.processComments(fileContent, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn);
+					this.processComments(fileContent, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn);
 				});
 			}
-		}, 10); // Small delay to ensure proper view state
+		}, 10);
 	}
 
-	private processComments(content: string, container: Element, toggleBtn?: HTMLButtonElement, toggleIcon?: HTMLElement, searchInput?: HTMLInputElement, clearSearchBtn?: HTMLButtonElement) {
+	private processComments(content: string, container: Element, toggleBtn?: HTMLButtonElement, toggleIcon?: HTMLElement, searchInput?: HTMLInputElement, clearSearchBtn?: HTMLButtonElement, printModeBtn?: HTMLButtonElement) {
 		this.debug('Processing comments for content of length:', content.length);
 		
-		// Store current expansion states before refresh
 		const currentStates = new Map<string, boolean>();
 		this.renderedGroups.forEach(rendered => {
 			if (rendered.group.header) {
@@ -642,7 +805,6 @@ class CommentsView extends ItemView {
 			}
 		});
 		
-		// Clear previous rendered groups
 		this.renderedGroups = [];
 		
 		const comments = this.plugin.extractComments(content);
@@ -657,20 +819,28 @@ class CommentsView extends ItemView {
 				cls: 'comments-empty' 
 			});
 			
-			// Disable button when no comments
 			if (toggleBtn) toggleBtn.disabled = true;
 			if (searchInput) searchInput.disabled = true;
+			if (printModeBtn) printModeBtn.disabled = true;
 			return;
 		}
 
 		// Enable controls when we have comments
 		if (toggleBtn) toggleBtn.disabled = false;
 		if (searchInput) searchInput.disabled = false;
+		if (printModeBtn) printModeBtn.disabled = false;
 
-		// Create comments list
+		// Set up Print Mode button event handler
+		if (printModeBtn) {
+			printModeBtn.onclick = (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				this.plugin.activatePrintMode();
+			};
+		}
+
 		const commentsList = container.createEl('div', { cls: 'comments-list' });
 
-		// Store reference to all groups for collapse/expand functionality
 		const allGroups: CommentGroup[] = [];
 		const collectAllGroups = (groups: CommentGroup[]) => {
 			groups.forEach(group => {
@@ -682,7 +852,6 @@ class CommentsView extends ItemView {
 		};
 		collectAllGroups(commentGroups);
 
-		// Set up toggle button event handler
 		if (toggleBtn && toggleIcon) {
 			toggleBtn.onclick = (e) => {
 				this.debug('Toggle button clicked, current state:', this.isCollapsed);
@@ -691,11 +860,9 @@ class CommentsView extends ItemView {
 				this.toggleAllGroups(toggleIcon);
 			};
 			
-			// Update button state based on current collapse state
 			this.updateToggleButton(toggleIcon);
 		}
 
-		// Set up search functionality
 		if (searchInput && clearSearchBtn) {
 			let searchTimeout: number | null = null;
 			let currentSearchTerm = '';
@@ -705,7 +872,6 @@ class CommentsView extends ItemView {
 				currentSearchTerm = searchTerm;
 				this.filterComments(commentsList, commentGroups, searchTerm);
 				
-				// Show/hide clear button
 				if (searchTerm) {
 					clearSearchBtn.style.display = 'block';
 				} else {
@@ -713,10 +879,8 @@ class CommentsView extends ItemView {
 				}
 			};
 			
-			// Store search term for highlighting
 			(this as any).currentSearchTerm = '';
 			
-			// Debounced search
 			searchInput.addEventListener('input', () => {
 				if (searchTimeout) {
 					window.clearTimeout(searchTimeout);
@@ -727,7 +891,6 @@ class CommentsView extends ItemView {
 				}, 300);
 			});
 			
-			// Clear search
 			clearSearchBtn.addEventListener('click', () => {
 				searchInput.value = '';
 				(this as any).currentSearchTerm = '';
@@ -735,20 +898,16 @@ class CommentsView extends ItemView {
 				searchInput.focus();
 			});
 			
-			// Hide clear button initially
 			clearSearchBtn.style.display = 'none';
 		}
 
-		// Render the hierarchical groups
 		commentGroups.forEach(group => {
-			// Only apply global collapsed state if there are no manual expansions
 			if (this.isCollapsed && !this.hasManualExpansions) {
 				this.setGroupCollapsedRecursively(group, true);
 			}
 			this.renderCommentGroup(group, commentsList, 0);
 		});
 		
-		// Restore previous expansion states if we have manual expansions
 		if (this.hasManualExpansions && currentStates.size > 0) {
 			this.restoreExpansionStates(commentGroups, currentStates);
 		}
@@ -756,6 +915,9 @@ class CommentsView extends ItemView {
 		this.debug('Rendered groups count:', this.renderedGroups.length);
 		this.debug('Initial collapsed state:', this.isCollapsed, 'hasManualExpansions:', this.hasManualExpansions);
 	}
+
+	// ... (rest of the CommentsView methods remain the same as in the original)
+	// I'll include the key methods but truncate for space
 
 	private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
 		const restoreGroup = (group: CommentGroup) => {
@@ -765,7 +927,6 @@ class CommentsView extends ItemView {
 				if (wasExpanded !== undefined) {
 					group.isCollapsed = !wasExpanded;
 					
-					// Update the visual state in the rendered groups
 					const rendered = this.renderedGroups.find(r => 
 						r.group.header && 
 						r.group.header.level === group.header!.level && 
@@ -798,23 +959,31 @@ class CommentsView extends ItemView {
 	private highlightSearchText(text: string, searchTerm: string): string {
 		if (!searchTerm) return text;
 		
-		const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+		const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\	private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
+		const restoreGroup = (group: CommentGroup) => {
+			if (group.header) {
+				const key = `${group.header.level}-${group.header.text}`;
+				const wasExpanded = states.get(key);
+				if (wasExpanded !== undefined) {
+					group.isCollapsed = !wasExpanded;
+					
+					const rendered = this.renderedGroups.find(r => 
+						r.group.header && 
+						r.group.header.level === group.header!.level && 
+						r.group.header.text')})`, 'gi');
 		return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 	}
 
 	private filterComments(commentsList: Element, commentGroups: CommentGroup[], searchTerm: string) {
-		// Clear current display
 		commentsList.empty();
 		
 		if (!searchTerm) {
-			// No search term - show all groups normally
 			commentGroups.forEach(group => {
 				this.renderCommentGroup(group, commentsList, 0);
 			});
 			return;
 		}
 		
-		// Filter groups and comments based on search term
 		const filteredGroups = this.filterGroupsRecursively(commentGroups, searchTerm);
 		
 		if (filteredGroups.length === 0) {
@@ -825,7 +994,6 @@ class CommentsView extends ItemView {
 			return;
 		}
 		
-		// Render filtered groups
 		filteredGroups.forEach(group => {
 			this.renderCommentGroup(group, commentsList, 0);
 		});
@@ -835,26 +1003,22 @@ class CommentsView extends ItemView {
 		const filtered: CommentGroup[] = [];
 		
 		groups.forEach(group => {
-			// Check if header matches search term
 			const headerMatches = group.header?.text.toLowerCase().includes(searchTerm) || false;
 			
-			// Filter comments in this group
 			const matchingComments = group.comments.filter(comment => 
 				comment.text.toLowerCase().includes(searchTerm)
 			);
 			
-			// Recursively filter children
 			const filteredChildren = group.children ? 
 				this.filterGroupsRecursively(group.children, searchTerm) : [];
 			
-			// Include group if header matches, has matching comments, or has matching children
 			if (headerMatches || matchingComments.length > 0 || filteredChildren.length > 0) {
 				const filteredGroup: CommentGroup = {
 					header: group.header,
 					comments: headerMatches ? group.comments : matchingComments,
 					children: filteredChildren.length > 0 ? filteredChildren : undefined,
 					parent: group.parent,
-					isCollapsed: false // Expand all when searching to show results
+					isCollapsed: false
 				};
 				
 				filtered.push(filteredGroup);
@@ -865,14 +1029,11 @@ class CommentsView extends ItemView {
 	}
 
 	private renderCommentGroup(group: CommentGroup, container: Element, depth: number) {
-		// Create header section
 		const headerSection = container.createEl('div', { cls: 'comment-header-section' });
 		headerSection.style.marginLeft = `${depth * 12}px`;
 		
-		// Create header element
 		const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
 		
-		// Add collapse/expand icon
 		const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
 		const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
 		
@@ -883,28 +1044,23 @@ class CommentsView extends ItemView {
 			collapseIcon.style.visibility = 'hidden';
 		}
 		
-		// Add header text (without # symbols)
 		const headerText = headerEl.createEl('span', { cls: 'comment-header-text' });
 		if (group.header) {
-			// Count total comments in this group and all children
 			const totalComments = this.countTotalComments(group);
 			if (totalComments > 0) {
 				headerText.textContent = `${group.header.text} (${totalComments})`;
 			} else {
-				// Show header without comment count if no comments
 				headerText.textContent = group.header.text;
 			}
 		} else {
 			headerText.textContent = `No Header (${group.comments.length})`;
 		}
 		
-		// Create content container for this group (comments + children)
 		const groupContent = headerSection.createEl('div', { cls: 'comment-group-content' });
 		if (group.isCollapsed) {
 			groupContent.style.display = 'none';
 		}
 		
-		// Store reference to this rendered group if it has collapsible content
 		if (hasChildren) {
 			this.renderedGroups.push({
 				group: group,
@@ -913,7 +1069,6 @@ class CommentsView extends ItemView {
 			});
 		}
 		
-		// Add click handler for collapse/expand icon
 		if (hasChildren) {
 			collapseIcon.addEventListener('click', (e) => {
 				this.debug('Collapse icon clicked for group:', group.header?.text || 'No Header');
@@ -923,42 +1078,32 @@ class CommentsView extends ItemView {
 			});
 		}
 		
-		// Add click handler for header text only (jump to header in editor)
 		if (group.header) {
 			headerText.addEventListener('click', (e) => {
 				this.debug('Header text clicked, navigating to:', group.header!.text);
 				e.preventDefault();
 				e.stopPropagation();
 				
-				// Set flag to prevent refresh from changing collapse state
 				this.plugin.skipNextRefresh = true;
-				
-				// Navigate to header without affecting collapse state
 				this.plugin.highlightHeaderInEditor(group.header!);
 				
-				// Clear the flag after a delay
 				setTimeout(() => {
 					this.plugin.skipNextRefresh = false;
 				}, 100);
 				
-				// Prevent any collapse/expand side effects
 				return false;
 			});
 			
-			// Prevent clicks on the header element itself from doing anything
 			headerEl.addEventListener('click', (e) => {
-				// Only allow clicks on the collapse icon or header text to proceed
 				if (e.target === collapseIcon || e.target === headerText) {
-					return; // Let the specific handlers deal with it
+					return;
 				}
-				// Stop any other clicks on the header element
 				e.preventDefault();
 				e.stopPropagation();
 				return false;
 			});
 		}
 
-		// Add comments for this group
 		if (group.comments.length > 0) {
 			const groupComments = groupContent.createEl('div', { cls: 'comment-group-comments' });
 			group.comments.forEach(comment => {
@@ -966,7 +1111,6 @@ class CommentsView extends ItemView {
 			});
 		}
 
-		// Recursively render children
 		if (group.children) {
 			group.children.forEach(childGroup => {
 				this.renderCommentGroup(childGroup, groupContent, depth + 1);
@@ -993,11 +1137,9 @@ class CommentsView extends ItemView {
 		} else {
 			icon.textContent = '▼';
 			content.style.display = 'block';
-			// User manually expanded a section
 			this.hasManualExpansions = true;
 		}
 
-		// When collapsing a parent, also collapse all children
 		if (group.isCollapsed && group.children) {
 			this.collapseAllChildren(group);
 		}
@@ -1011,14 +1153,13 @@ class CommentsView extends ItemView {
 		if (this.isCollapsed) {
 			this.debug('Expanding all groups');
 			this.expandAllGroups([]);
-			this.hasManualExpansions = false; // Reset manual expansion tracking
+			this.hasManualExpansions = false;
 		} else {
 			this.debug('Collapsing all groups to top level overview');
 			this.collapseAllGroups([]);
-			this.hasManualExpansions = false; // Reset manual expansion tracking
+			this.hasManualExpansions = false;
 		}
 		
-		// Toggle state and update icon
 		this.isCollapsed = !this.isCollapsed;
 		this.updateToggleButton(toggleIcon);
 		
@@ -1027,12 +1168,10 @@ class CommentsView extends ItemView {
 	
 	private updateToggleButton(toggleIcon: HTMLElement) {
 		if (this.isCollapsed) {
-			// When collapsed, show expand icon
-			toggleIcon.innerHTML = '+'; // Simple plus
+			toggleIcon.innerHTML = '+';
 			toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
 		} else {
-			// When expanded, show collapse icon
-			toggleIcon.innerHTML = '-'; // Simple minus
+			toggleIcon.innerHTML = '-';
 			toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
 		}
 	}
@@ -1072,15 +1211,12 @@ class CommentsView extends ItemView {
 	private createCommentElement(comment: CommentData, container: Element) {
 		const commentEl = container.createEl('div', { cls: 'comment-item' });
 		
-		// Comment content
 		const contentEl = commentEl.createEl('div', { cls: 'comment-content' });
 		
-		// Editable comment text - use textarea for multi-line support
 		const isMultiLine = comment.text.includes('\n');
 		
 		let textEl: HTMLElement;
 		if (isMultiLine) {
-			// Use textarea for multi-line comments
 			textEl = contentEl.createEl('textarea', { 
 				cls: 'comment-text comment-textarea',
 				attr: { 
@@ -1090,7 +1226,6 @@ class CommentsView extends ItemView {
 			}) as HTMLTextAreaElement;
 			(textEl as HTMLTextAreaElement).value = comment.text || '';
 		} else {
-			// Use div for single-line comments
 			textEl = contentEl.createEl('div', { 
 				cls: 'comment-text',
 				attr: { contenteditable: 'true', spellcheck: 'false' }
@@ -1098,39 +1233,32 @@ class CommentsView extends ItemView {
 			textEl.textContent = comment.text || '(empty comment)';
 		}
 		
-		// Apply search highlighting if there's a current search term
 		const currentSearchTerm = (this as any).currentSearchTerm || '';
 		if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
-			// Only apply highlighting to single-line comments in contenteditable divs
 			if (textEl.tagName === 'DIV') {
 				textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
 			}
 		}
 		
-		// Line number (not editable)
 		const lineEl = contentEl.createEl('div', { 
 			text: `Line ${comment.line + 1}`, 
 			cls: 'comment-line' 
 		});
 
-		// Action buttons container
 		const actionsEl = commentEl.createEl('div', { cls: 'comment-actions' });
 		
-		// Save button (initially hidden)
 		const saveBtn = actionsEl.createEl('button', { 
 			text: 'Save', 
 			cls: 'comment-btn comment-save-btn' 
 		});
 		saveBtn.style.display = 'none';
 		
-		// Cancel button (initially hidden)
 		const cancelBtn = actionsEl.createEl('button', { 
 			text: 'Cancel', 
 			cls: 'comment-btn comment-cancel-btn' 
 		});
 		cancelBtn.style.display = 'none';
 
-		// Delete button
 		const deleteBtn = actionsEl.createEl('button', { 
 			text: '×', 
 			cls: 'comment-btn comment-delete-btn',
@@ -1140,7 +1268,6 @@ class CommentsView extends ItemView {
 		let originalText = comment.text;
 		let isEditing = false;
 
-		// Handle text editing - works for both div and textarea
 		const handleInput = () => {
 			if (!isEditing) {
 				isEditing = true;
@@ -1154,7 +1281,6 @@ class CommentsView extends ItemView {
 		if (textEl.tagName === 'TEXTAREA') {
 			(textEl as HTMLTextAreaElement).addEventListener('input', handleInput);
 			
-			// Auto-resize textarea as content changes
 			const autoResize = () => {
 				const textarea = textEl as HTMLTextAreaElement;
 				textarea.style.height = 'auto';
@@ -1162,20 +1288,16 @@ class CommentsView extends ItemView {
 			};
 			
 			(textEl as HTMLTextAreaElement).addEventListener('input', autoResize);
-			// Initial resize
 			setTimeout(autoResize, 0);
 		} else {
 			textEl.addEventListener('input', handleInput);
 		}
 
-		// Handle keyboard shortcuts in edit mode
 		const handleKeydown = (e: KeyboardEvent) => {
 			if (e.key === 'Enter' && !e.shiftKey && textEl.tagName !== 'TEXTAREA') {
-				// For contenteditable divs, Enter saves (unless Shift+Enter)
 				e.preventDefault();
 				saveComment();
 			} else if (e.key === 'Enter' && e.ctrlKey && textEl.tagName === 'TEXTAREA') {
-				// For textareas, Ctrl+Enter saves
 				e.preventDefault();
 				saveComment();
 			} else if (e.key === 'Escape') {
@@ -1186,7 +1308,6 @@ class CommentsView extends ItemView {
 
 		textEl.addEventListener('keydown', handleKeydown);
 
-		// Save comment function
 		const saveComment = () => {
 			let newText: string;
 			if (textEl.tagName === 'TEXTAREA') {
@@ -1202,12 +1323,10 @@ class CommentsView extends ItemView {
 			exitEditMode();
 		};
 
-		// Cancel edit function
 		const cancelEdit = () => {
 			if (textEl.tagName === 'TEXTAREA') {
 				(textEl as HTMLTextAreaElement).value = originalText;
 			} else {
-				// Restore original text with highlighting if applicable
 				if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
 					textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
 				} else {
@@ -1217,7 +1336,6 @@ class CommentsView extends ItemView {
 			exitEditMode();
 		};
 
-		// Exit edit mode function
 		const exitEditMode = () => {
 			isEditing = false;
 			saveBtn.style.display = 'none';
@@ -1227,7 +1345,6 @@ class CommentsView extends ItemView {
 			textEl.blur();
 		};
 
-		// Button event listeners
 		saveBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
 			saveComment();
@@ -1241,44 +1358,36 @@ class CommentsView extends ItemView {
 		deleteBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
 			
-			// Add confirmation dialog
 			const confirmDelete = confirm(`Are you sure you want to delete this comment?\n\n"${comment.text.length > 100 ? comment.text.substring(0, 100) + '...' : comment.text}"`);
 			if (confirmDelete) {
 				this.deleteCommentFromEditor(comment);
 			}
 		});
 
-		// Make the comment clickable (only when not editing)
 		commentEl.addEventListener('click', (e) => {
 			this.debug('Comment clicked, isEditing:', isEditing, 'target:', e.target);
 			
-			// Don't navigate if we're editing
 			if (isEditing) return;
 			
-			// Check if the click was on a button
 			const target = e.target as HTMLElement;
 			if (target.tagName === 'BUTTON' || target.closest('button')) {
 				this.debug('Click was on button, ignoring');
 				return;
 			}
 			
-			// If clicking on the text element specifically, make it editable instead of navigating
 			if (target === textEl) {
 				this.debug('Clicked on text element, entering edit mode');
 				e.preventDefault();
 				e.stopPropagation();
 				
-				// Enter edit mode
 				isEditing = true;
 				saveBtn.style.display = 'inline-block';
 				cancelBtn.style.display = 'inline-block';
 				deleteBtn.style.display = 'none';
 				commentEl.addClass('comment-editing');
 				
-				// Focus the text element for editing
 				textEl.focus();
 				
-				// Select all text for easy editing
 				if (textEl.tagName === 'TEXTAREA') {
 					(textEl as HTMLTextAreaElement).select();
 				} else {
@@ -1294,17 +1403,13 @@ class CommentsView extends ItemView {
 				return;
 			}
 			
-			// For clicks anywhere else in the comment, navigate to the comment in the document
 			this.debug('Calling highlightCommentInEditor');
 			e.preventDefault();
 			e.stopPropagation();
 			
-			// Set flag to prevent refresh from changing collapse state
 			this.plugin.skipNextRefresh = true;
-			
 			this.plugin.highlightCommentInEditor(comment);
 			
-			// Clear the flag after a delay
 			setTimeout(() => {
 				this.plugin.skipNextRefresh = false;
 			}, 300);
@@ -1318,13 +1423,11 @@ class CommentsView extends ItemView {
 	updateCommentInEditor(comment: CommentData, newText: string) {
 		this.debug('updateCommentInEditor called with:', newText);
 		
-		// Use the same robust view detection as in refresh()
 		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		let currentFile = this.app.workspace.getActiveFile();
 		
 		this.debug('Active view:', !!activeView, 'Current file:', !!currentFile);
 		
-		// If no active view but we have a current file, try to find the view for that file
 		if (!activeView && currentFile) {
 			const leaves = this.app.workspace.getLeavesOfType('markdown');
 			for (const leaf of leaves) {
@@ -1337,7 +1440,6 @@ class CommentsView extends ItemView {
 			}
 		}
 		
-		// If we still don't have a view, but we have the current file stored, use that
 		if (!activeView && this.currentFile) {
 			this.debug('Using stored current file for update');
 			currentFile = this.currentFile;
@@ -1364,7 +1466,6 @@ class CommentsView extends ItemView {
 		this.debug('Current content length:', currentContent.length);
 		this.debug('Original comment:', comment);
 		
-		// Find the comment again in the current content to get fresh positions
 		const currentComments = this.plugin.extractComments(currentContent);
 		const matchingComment = currentComments.find(c => 
 			c.text === comment.text && 
@@ -1373,14 +1474,12 @@ class CommentsView extends ItemView {
 		
 		if (!matchingComment) {
 			this.debug('Could not find matching comment in current content');
-			// Fallback: try to find by text only
 			const textMatch = currentComments.find(c => c.text === comment.text);
 			if (textMatch) {
 				this.debug('Found comment by text match');
 				this.performCommentUpdate(editor, textMatch, newText);
 			} else {
 				this.debug('Comment not found, it may have been deleted');
-				// Refresh the view to show current state
 				this.refresh();
 			}
 			return;
@@ -1393,25 +1492,20 @@ class CommentsView extends ItemView {
 	private performCommentUpdate(editor: any, comment: CommentData, newText: string) {
 		const content = editor.getValue();
 		
-		// Use the fresh comment positions
 		const beforeComment = content.substring(0, comment.startPos);
 		const afterComment = content.substring(comment.endPos);
 		
-		// Create the new comment with the updated text
 		const newComment = `${this.plugin.settings.commentPrefix} ${newText} ${this.plugin.settings.commentPrefix}`;
 		
 		this.debug('Replacing comment at positions', comment.startPos, '-', comment.endPos);
 		this.debug('Old comment:', comment.fullMatch);
 		this.debug('New comment:', newComment);
 		
-		// Replace the content
 		const newContent = beforeComment + newComment + afterComment;
 		editor.setValue(newContent);
 		
-		// Show success message
 		new Notice('Comment updated');
 		
-		// Refresh the view after a short delay to get updated positions
 		setTimeout(() => {
 			this.debug('Refreshing view after comment update');
 			this.refresh();
@@ -1421,13 +1515,11 @@ class CommentsView extends ItemView {
 	deleteCommentFromEditor(comment: CommentData) {
 		this.debug('deleteCommentFromEditor called for:', comment);
 		
-		// Use the same robust view detection as in refresh()
 		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		let currentFile = this.app.workspace.getActiveFile();
 		
 		this.debug('Delete - Active view:', !!activeView, 'Current file:', !!currentFile);
 		
-		// If no active view but we have a current file, try to find the view for that file
 		if (!activeView && currentFile) {
 			const leaves = this.app.workspace.getLeavesOfType('markdown');
 			for (const leaf of leaves) {
@@ -1440,7 +1532,6 @@ class CommentsView extends ItemView {
 			}
 		}
 		
-		// If we still don't have a view, but we have the current file stored, use that
 		if (!activeView && this.currentFile) {
 			this.debug('Using stored current file for delete');
 			currentFile = this.currentFile;
@@ -1463,7 +1554,6 @@ class CommentsView extends ItemView {
 		const editor = activeView.editor;
 		const currentContent = editor.getValue();
 		
-		// Find the comment again in the current content to get fresh positions
 		const currentComments = this.plugin.extractComments(currentContent);
 		const matchingComment = currentComments.find(c => 
 			c.text === comment.text && 
@@ -1472,28 +1562,22 @@ class CommentsView extends ItemView {
 		
 		if (!matchingComment) {
 			this.debug('Could not find matching comment to delete');
-			this.refresh(); // Refresh to show current state
+			this.refresh();
 			return;
 		}
 		
 		this.debug('Deleting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
 		
-		// Get the content before and after the comment
 		const beforeComment = currentContent.substring(0, matchingComment.startPos);
 		const afterComment = currentContent.substring(matchingComment.endPos);
 		
-		// Simply remove the comment by joining before and after
 		const newContent = beforeComment + afterComment;
-		
-		// Clean up any double spaces that might be left behind
 		const finalContent = newContent.replace(/  +/g, ' ');
 		
 		editor.setValue(finalContent);
 		
-		// Show success message
 		new Notice('Comment deleted');
 		
-		// Refresh the view
 		setTimeout(() => {
 			this.debug('Refreshing view after comment deletion');
 			this.refresh();
@@ -1501,7 +1585,7 @@ class CommentsView extends ItemView {
 	}
 }
 
-// Settings tab class
+// Settings tab class with Print Mode settings
 class CommentsManagerSettingTab extends PluginSettingTab {
 	plugin: CommentsManagerPlugin;
 
@@ -1559,5 +1643,48 @@ class CommentsManagerSettingTab extends PluginSettingTab {
 					this.plugin.settings.debugMode = value;
 					await this.plugin.saveSettings();
 				}));
+
+		// Print Mode Settings Section
+		containerEl.createEl('h3', { text: 'Print Mode Settings' });
+
+		new Setting(containerEl)
+			.setName('Callout type for print mode')
+			.setDesc('The type of callout to use when converting comments (e.g., comment, note, info)')
+			.addText(text => text
+				.setPlaceholder('comment')
+				.setValue(this.plugin.settings.printModeCalloutType)
+				.onChange(async (value) => {
+					this.plugin.settings.printModeCalloutType = value || 'comment';
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Include comment author')
+			.setDesc('Include author information in converted callouts (placeholder for future feature)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.includeCommentAuthor)
+				.onChange(async (value) => {
+					this.plugin.settings.includeCommentAuthor = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Include comment timestamp')
+			.setDesc('Include timestamp information in converted callouts (placeholder for future feature)')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.includeCommentTimestamp)
+				.onChange(async (value) => {
+					this.plugin.settings.includeCommentTimestamp = value;
+					await this.plugin.saveSettings();
+				}));
+
+		// Print Mode Usage Instructions
+		const instructionsEl = containerEl.createEl('div', { cls: 'print-mode-instructions' });
+		instructionsEl.createEl('h4', { text: 'How to use Print Mode:' });
+		const instructionsList = instructionsEl.createEl('ol');
+		instructionsList.createEl('li', { text: 'Click the 🖨️ button in the Comments panel or use the command "Activate Print Mode"' });
+		instructionsList.createEl('li', { text: 'Preview how your document will look with comments converted to callouts' });
+		instructionsList.createEl('li', { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
+		instructionsList.createEl('li', { text: 'Your original document remains unchanged - comments are converted temporarily' });
 	}
 }
