@@ -33,15 +33,173 @@ var DEFAULT_SETTINGS = {
   commentPrefix: "%%",
   openOnStart: true,
   debugMode: false,
-  defaultCollapsed: true
+  defaultCollapsed: true,
+  // Print Mode defaults
+  printModeCalloutType: "comment",
+  includeCommentAuthor: false,
+  includeCommentTimestamp: false
 };
 var COMMENTS_VIEW_TYPE = "comments-manager-view";
+var PrintModePreviewModal = class extends import_obsidian.Modal {
+  // Store the active view reference
+  constructor(app, plugin, originalContent, convertedContent, activeView) {
+    super(app);
+    this.plugin = plugin;
+    this.originalContent = originalContent;
+    this.convertedContent = convertedContent;
+    this.activeView = activeView;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Print Mode Preview" });
+    const desc = contentEl.createEl("p", { cls: "print-mode-description" });
+    desc.innerHTML = "This preview shows how your document will look with comments converted to callouts for printing/PDF export. The original document will not be modified.";
+    const previewContainer = contentEl.createEl("div", { cls: "print-mode-preview-container" });
+    const previewEl = previewContainer.createEl("pre", { cls: "print-mode-preview" });
+    previewEl.textContent = this.convertedContent;
+    const buttonContainer = contentEl.createEl("div", { cls: "print-mode-buttons" });
+    const exportBtn = buttonContainer.createEl("button", {
+      text: "Export to PDF",
+      cls: "mod-cta"
+    });
+    const copyBtn = buttonContainer.createEl("button", {
+      text: "Copy Content"
+    });
+    const cancelBtn = buttonContainer.createEl("button", {
+      text: "Cancel"
+    });
+    exportBtn.onclick = () => {
+      this.triggerPDFExport();
+    };
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(this.convertedContent);
+      new import_obsidian.Notice("Converted content copied to clipboard");
+    };
+    cancelBtn.onclick = () => {
+      this.close();
+    };
+  }
+  async triggerPDFExport() {
+    if (!this.activeView) {
+      new import_obsidian.Notice("No active markdown view available");
+      return;
+    }
+    const editor = this.activeView.editor;
+    if (!editor) {
+      new import_obsidian.Notice("Editor is no longer available");
+      return;
+    }
+    const originalContent = editor.getValue();
+    try {
+      this.close();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      this.activeView.editor.focus();
+      editor.setValue(this.convertedContent);
+      editor.refresh();
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const restoreContent = () => {
+        editor.setValue(originalContent);
+        editor.refresh();
+        new import_obsidian.Notice("Original content restored");
+      };
+      const notice = new import_obsidian.Notice("Document converted to callouts! Now use Ctrl+P or File \u2192 Export to PDF. Click here when done to restore original content.", 0);
+      notice.noticeEl.style.cursor = "pointer";
+      notice.noticeEl.addEventListener("click", () => {
+        restoreContent();
+        notice.hide();
+      });
+      const restoreCommand = this.plugin.addCommand({
+        id: "restore-original-content",
+        name: "Restore Original Content (after Print Mode)",
+        callback: () => {
+          restoreContent();
+          notice.hide();
+          this.plugin.removeCommand("restore-original-content");
+        }
+      });
+    } catch (error) {
+      console.error("Error during PDF export preparation:", error);
+      new import_obsidian.Notice("Error preparing for PDF export: " + error.message);
+      try {
+        editor.setValue(originalContent);
+        editor.refresh();
+      } catch (restoreError) {
+        console.error("Error restoring content:", restoreError);
+      }
+    }
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
+var CommentConversionModal = class extends import_obsidian.Modal {
+  constructor(app, comment, onConfirm) {
+    super(app);
+    this.comment = comment;
+    this.onConfirm = onConfirm;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "Convert Comment to Callout" });
+    const previewContainer = contentEl.createEl("div", { cls: "conversion-modal-preview" });
+    previewContainer.createEl("h4", { text: "Comment:" });
+    const commentPreview = previewContainer.createEl("div", { cls: "conversion-modal-comment" });
+    commentPreview.textContent = this.comment.text.length > 200 ? this.comment.text.substring(0, 200) + "..." : this.comment.text;
+    const titleContainer = contentEl.createEl("div", { cls: "conversion-modal-title-container" });
+    titleContainer.createEl("label", {
+      text: 'Callout Title (leave blank for "Comment"):',
+      cls: "conversion-modal-label"
+    });
+    const titleInput = titleContainer.createEl("input", {
+      type: "text",
+      cls: "conversion-modal-input",
+      attr: {
+        placeholder: 'e.g., "Important Note", "Question", "Suggestion"...',
+        spellcheck: "false"
+      }
+    });
+    const infoEl = contentEl.createEl("p", { cls: "conversion-modal-info" });
+    infoEl.innerHTML = "<strong>Note:</strong> This will permanently replace the comment with a visible callout. This action cannot be undone.";
+    const buttonContainer = contentEl.createEl("div", { cls: "conversion-modal-buttons" });
+    const convertBtn = buttonContainer.createEl("button", {
+      text: "Convert to Callout",
+      cls: "mod-cta"
+    });
+    const cancelBtn = buttonContainer.createEl("button", {
+      text: "Cancel"
+    });
+    convertBtn.onclick = () => {
+      const customTitle = titleInput.value.trim();
+      this.onConfirm(customTitle);
+      this.close();
+    };
+    cancelBtn.onclick = () => {
+      this.close();
+    };
+    titleInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        convertBtn.click();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelBtn.click();
+      }
+    });
+    setTimeout(() => titleInput.focus(), 100);
+  }
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
+};
 var CommentsManagerPlugin = class extends import_obsidian.Plugin {
   constructor() {
     super(...arguments);
     this.refreshTimeout = null;
     this.skipNextRefresh = false;
-    // Made public so CommentsView can access it
     this.allHeaders = [];
   }
   debug(message, ...args) {
@@ -55,7 +213,7 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
       COMMENTS_VIEW_TYPE,
       (leaf) => new CommentsView(leaf, this)
     );
-    this.addRibbonIcon("percent", "Toggle Comments Panel", () => {
+    this.addRibbonIcon("message-square", "Toggle Comments Panel", () => {
       this.activateView();
     });
     this.addCommand({
@@ -75,6 +233,13 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
         this.refreshCommentsView();
       }
     });
+    this.addCommand({
+      id: "activate-print-mode",
+      name: "Activate Print Mode (Convert Comments to Callouts)",
+      callback: () => {
+        this.activatePrintMode();
+      }
+    });
     this.addSettingTab(new CommentsManagerSettingTab(this.app, this));
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
@@ -91,6 +256,91 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
         this.activateView();
       });
     }
+  }
+  activatePrintMode() {
+    let activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+    let currentFile = this.app.workspace.getActiveFile();
+    this.debug("Print Mode - Active view:", !!activeView, "Current file:", !!currentFile);
+    if (!activeView && currentFile) {
+      const leaves = this.app.workspace.getLeavesOfType("markdown");
+      for (const leaf of leaves) {
+        const view = leaf.view;
+        if (view.file === currentFile) {
+          activeView = view;
+          this.debug("Found view for current file in Print Mode");
+          break;
+        }
+      }
+    }
+    const commentsLeaves = this.app.workspace.getLeavesOfType(COMMENTS_VIEW_TYPE);
+    if (!activeView && commentsLeaves.length > 0) {
+      const commentsView = commentsLeaves[0].view;
+      if (commentsView.currentFile) {
+        currentFile = commentsView.currentFile;
+        this.debug("Using stored current file from comments view");
+        const leaves = this.app.workspace.getLeavesOfType("markdown");
+        for (const leaf of leaves) {
+          const view = leaf.view;
+          if (view.file === currentFile) {
+            activeView = view;
+            this.debug("Found view for stored file in Print Mode");
+            break;
+          }
+        }
+      }
+    }
+    if (!activeView) {
+      new import_obsidian.Notice("No active markdown file found. Please open a markdown file first.");
+      return;
+    }
+    const content = activeView.editor.getValue();
+    if (!content || content.trim().length === 0) {
+      new import_obsidian.Notice("The current file is empty");
+      return;
+    }
+    const convertedContent = this.convertCommentsToCallouts(content);
+    if (convertedContent === content) {
+      new import_obsidian.Notice("No comments found to convert");
+      return;
+    }
+    new PrintModePreviewModal(this.app, this, content, convertedContent, activeView).open();
+  }
+  convertCommentsToCallouts(content) {
+    const comments = this.extractComments(content);
+    const headers = this.extractHeaders(content);
+    if (comments.length === 0) {
+      return content;
+    }
+    let result = content;
+    const sortedComments = [...comments].sort((a, b) => b.startPos - a.startPos);
+    for (const comment of sortedComments) {
+      const callout = this.createCalloutFromComment(comment, headers);
+      const before = result.substring(0, comment.startPos);
+      const after = result.substring(comment.endPos);
+      result = before + callout + after;
+    }
+    return result;
+  }
+  createCalloutFromComment(comment, headers) {
+    const calloutType = this.settings.printModeCalloutType;
+    let nearestHeader = null;
+    for (let i = headers.length - 1; i >= 0; i--) {
+      if (headers[i].line < comment.line) {
+        nearestHeader = headers[i];
+        break;
+      }
+    }
+    let title = "Comment";
+    if (nearestHeader) {
+      title = `Comment: ${nearestHeader.text}`;
+    }
+    title += ` (Line ${comment.line + 1})`;
+    const commentText = comment.text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0).join("\n> ");
+    let callout = `
+> [!${calloutType}]+ ${title}
+> ${commentText}
+`;
+    return callout;
   }
   debounceRefresh() {
     this.debug("debounceRefresh called, skipNextRefresh:", this.skipNextRefresh);
@@ -331,13 +581,11 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
   }
 };
 var CommentsView = class extends import_obsidian.ItemView {
-  // Track if user manually expanded sections
   constructor(leaf, plugin) {
     super(leaf);
     this.currentFile = null;
     this.renderedGroups = [];
     this.isCollapsed = false;
-    // Will be set from settings
     this.hasManualExpansions = false;
     this.plugin = plugin;
     this.isCollapsed = plugin.settings.defaultCollapsed;
@@ -368,13 +616,18 @@ var CommentsView = class extends import_obsidian.ItemView {
     const header = container.createEl("div", { cls: "comments-header" });
     const titleRow = header.createEl("div", { cls: "comments-title-row" });
     titleRow.createEl("h4", { text: "Comments", cls: "comments-title" });
-    const toggleAllBtn = titleRow.createEl("button", {
+    const controlsContainer = titleRow.createEl("div", { cls: "comments-controls" });
+    const printModeBtn = controlsContainer.createEl("button", {
+      cls: "comments-control-btn print-mode-btn",
+      attr: { title: "Convert comments to callouts for printing" }
+    });
+    (0, import_obsidian.setIcon)(printModeBtn, "printer");
+    const toggleAllBtn = controlsContainer.createEl("button", {
       cls: "comments-toggle-btn",
       attr: { title: "Toggle collapse/expand all sections" }
     });
     const toggleIcon = toggleAllBtn.createEl("span", { cls: "comments-toggle-icon" });
-    toggleIcon.innerHTML = this.isCollapsed ? "+" : "-";
-    const spacer = titleRow.createEl("div", { cls: "comments-spacer" });
+    (0, import_obsidian.setIcon)(toggleIcon, this.isCollapsed ? "plus" : "minus");
     const searchContainer = header.createEl("div", { cls: "comments-search-container" });
     const searchInput = searchContainer.createEl("input", {
       type: "text",
@@ -388,7 +641,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comments-clear-search",
       attr: { title: "Clear search" }
     });
-    clearSearchBtn.innerHTML = "\xD7";
+    (0, import_obsidian.setIcon)(clearSearchBtn, "x");
     setTimeout(() => {
       this.debug("Executing delayed refresh check");
       let activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
@@ -416,6 +669,7 @@ var CommentsView = class extends import_obsidian.ItemView {
           cls: "comments-empty"
         });
         toggleAllBtn.disabled = true;
+        printModeBtn.disabled = true;
         return;
       }
       if (currentFile) {
@@ -426,16 +680,16 @@ var CommentsView = class extends import_obsidian.ItemView {
       if (activeView) {
         content = activeView.editor.getValue();
         this.debug("Got content from active view");
-        this.processComments(content, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn);
+        this.processComments(content, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn);
       } else if (currentFile) {
         this.app.vault.read(currentFile).then((fileContent) => {
           this.debug("Got content from file read");
-          this.processComments(fileContent, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn);
+          this.processComments(fileContent, container, toggleAllBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn);
         });
       }
     }, 10);
   }
-  processComments(content, container, toggleBtn, toggleIcon, searchInput, clearSearchBtn) {
+  processComments(content, container, toggleBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn) {
     this.debug("Processing comments for content of length:", content.length);
     const currentStates = /* @__PURE__ */ new Map();
     this.renderedGroups.forEach((rendered) => {
@@ -456,10 +710,19 @@ var CommentsView = class extends import_obsidian.ItemView {
       });
       if (toggleBtn) toggleBtn.disabled = true;
       if (searchInput) searchInput.disabled = true;
+      if (printModeBtn) printModeBtn.disabled = true;
       return;
     }
     if (toggleBtn) toggleBtn.disabled = false;
     if (searchInput) searchInput.disabled = false;
+    if (printModeBtn) printModeBtn.disabled = false;
+    if (printModeBtn) {
+      printModeBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this.plugin.activatePrintMode();
+      };
+    }
     const commentsList = container.createEl("div", { cls: "comments-list" });
     const allGroups = [];
     const collectAllGroups = (groups) => {
@@ -534,7 +797,7 @@ var CommentsView = class extends import_obsidian.ItemView {
             (r) => r.group.header && r.group.header.level === group.header.level && r.group.header.text === group.header.text
           );
           if (rendered) {
-            rendered.collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+            (0, import_obsidian.setIcon)(rendered.collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
             rendered.contentElement.style.display = group.isCollapsed ? "none" : "block";
           }
         }
@@ -594,7 +857,6 @@ var CommentsView = class extends import_obsidian.ItemView {
           children: filteredChildren.length > 0 ? filteredChildren : void 0,
           parent: group.parent,
           isCollapsed: false
-          // Expand all when searching to show results
         };
         filtered.push(filteredGroup);
       }
@@ -608,7 +870,7 @@ var CommentsView = class extends import_obsidian.ItemView {
     const collapseIcon = headerEl.createEl("span", { cls: "comment-collapse-icon" });
     const hasChildren = group.children && group.children.length > 0 || group.comments.length > 0;
     if (hasChildren) {
-      collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+      (0, import_obsidian.setIcon)(collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
       collapseIcon.style.visibility = "visible";
     } else {
       collapseIcon.style.visibility = "hidden";
@@ -689,10 +951,10 @@ var CommentsView = class extends import_obsidian.ItemView {
   toggleGroupCollapse(group, icon, content) {
     group.isCollapsed = !group.isCollapsed;
     if (group.isCollapsed) {
-      icon.textContent = "\u25B6";
+      (0, import_obsidian.setIcon)(icon, "chevron-right");
       content.style.display = "none";
     } else {
-      icon.textContent = "\u25BC";
+      (0, import_obsidian.setIcon)(icon, "chevron-down");
       content.style.display = "block";
       this.hasManualExpansions = true;
     }
@@ -718,10 +980,10 @@ var CommentsView = class extends import_obsidian.ItemView {
   }
   updateToggleButton(toggleIcon) {
     if (this.isCollapsed) {
-      toggleIcon.innerHTML = "+";
+      (0, import_obsidian.setIcon)(toggleIcon, "plus");
       toggleIcon.parentElement.setAttribute("title", "Expand all sections");
     } else {
-      toggleIcon.innerHTML = "-";
+      (0, import_obsidian.setIcon)(toggleIcon, "minus");
       toggleIcon.parentElement.setAttribute("title", "Collapse all sections");
     }
   }
@@ -731,7 +993,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       const hasContent = rendered.group.children && rendered.group.children.length > 0 || rendered.group.comments.length > 0;
       if (hasContent) {
         rendered.group.isCollapsed = true;
-        rendered.collapseIcon.textContent = "\u25B6";
+        (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-right");
         rendered.contentElement.style.display = "none";
       }
     });
@@ -740,7 +1002,7 @@ var CommentsView = class extends import_obsidian.ItemView {
     this.debug("Expanding all groups");
     this.renderedGroups.forEach((rendered) => {
       rendered.group.isCollapsed = false;
-      rendered.collapseIcon.textContent = "\u25BC";
+      (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-down");
       rendered.contentElement.style.display = "block";
     });
   }
@@ -794,10 +1056,21 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comment-btn comment-cancel-btn"
     });
     cancelBtn.style.display = "none";
+    const convertBtn = actionsEl.createEl("button", {
+      cls: "comment-btn comment-convert-btn",
+      attr: { title: "Convert to callout" }
+    });
+    (0, import_obsidian.setIcon)(convertBtn, "pencil");
     const deleteBtn = actionsEl.createEl("button", {
-      text: "\xD7",
       cls: "comment-btn comment-delete-btn",
       attr: { title: "Delete comment" }
+    });
+    (0, import_obsidian.setIcon)(deleteBtn, "trash");
+    convertBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      new CommentConversionModal(this.app, comment, (customTitle) => {
+        this.convertCommentToCallout(comment, customTitle);
+      }).open();
     });
     let originalText = comment.text;
     let isEditing = false;
@@ -1059,6 +1332,93 @@ var CommentsView = class extends import_obsidian.ItemView {
       this.refresh();
     }, 100);
   }
+  convertCommentToCallout(comment, customTitle) {
+    this.debug("convertCommentToCallout called for:", comment, "with title:", customTitle);
+    let activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+    let currentFile = this.app.workspace.getActiveFile();
+    this.debug("Convert - Active view:", !!activeView, "Current file:", !!currentFile);
+    if (!activeView && currentFile) {
+      const leaves = this.app.workspace.getLeavesOfType("markdown");
+      for (const leaf of leaves) {
+        const view = leaf.view;
+        if (view.file === currentFile) {
+          activeView = view;
+          this.debug("Found view for current file in convert");
+          break;
+        }
+      }
+    }
+    if (!activeView && this.currentFile) {
+      this.debug("Using stored current file for convert");
+      currentFile = this.currentFile;
+      const leaves = this.app.workspace.getLeavesOfType("markdown");
+      for (const leaf of leaves) {
+        const view = leaf.view;
+        if (view.file === currentFile) {
+          activeView = view;
+          this.debug("Found view for stored file in convert");
+          break;
+        }
+      }
+    }
+    if (!activeView) {
+      this.debug("No active view found for converting comment");
+      return;
+    }
+    const editor = activeView.editor;
+    const currentContent = editor.getValue();
+    const currentComments = this.plugin.extractComments(currentContent);
+    const matchingComment = currentComments.find(
+      (c) => c.text === comment.text && c.line === comment.line
+    );
+    if (!matchingComment) {
+      this.debug("Could not find matching comment to convert");
+      this.refresh();
+      return;
+    }
+    const headers = this.plugin.extractHeaders(currentContent);
+    const callout = this.createCalloutFromComment(matchingComment, headers, customTitle);
+    this.debug("Converting comment at positions", matchingComment.startPos, "-", matchingComment.endPos);
+    this.debug("Original comment:", matchingComment.fullMatch);
+    this.debug("New callout:", callout);
+    const beforeComment = currentContent.substring(0, matchingComment.startPos);
+    const afterComment = currentContent.substring(matchingComment.endPos);
+    const newContent = beforeComment + callout + afterComment;
+    editor.setValue(newContent);
+    editor.refresh();
+    const titleText = customTitle ? `"${customTitle}"` : "callout";
+    new import_obsidian.Notice(`Comment converted to ${titleText}`);
+    setTimeout(() => {
+      this.debug("Refreshing view after comment conversion");
+      this.refresh();
+    }, 100);
+  }
+  createCalloutFromComment(comment, headers, customTitle) {
+    const calloutType = this.plugin.settings.printModeCalloutType;
+    let title;
+    if (customTitle && customTitle.trim().length > 0) {
+      title = customTitle.trim();
+    } else {
+      let nearestHeader = null;
+      for (let i = headers.length - 1; i >= 0; i--) {
+        if (headers[i].line < comment.line) {
+          nearestHeader = headers[i];
+          break;
+        }
+      }
+      title = "Comment";
+      if (nearestHeader) {
+        title = `Comment: ${nearestHeader.text}`;
+      }
+      title += ` (Line ${comment.line + 1})`;
+    }
+    const commentText = comment.text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0).join("\n> ");
+    let callout = `
+> [!${calloutType}]+ ${title}
+> ${commentText}
+`;
+    return callout;
+  }
 };
 var CommentsManagerSettingTab = class extends import_obsidian.PluginSettingTab {
   constructor(app, plugin) {
@@ -1087,5 +1447,25 @@ var CommentsManagerSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.debugMode = value;
       await this.plugin.saveSettings();
     }));
+    containerEl.createEl("h3", { text: "Print Mode Settings" });
+    new import_obsidian.Setting(containerEl).setName("Callout type for print mode").setDesc("The type of callout to use when converting comments (e.g., comment, note, info)").addText((text) => text.setPlaceholder("comment").setValue(this.plugin.settings.printModeCalloutType).onChange(async (value) => {
+      this.plugin.settings.printModeCalloutType = value || "comment";
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Include comment author").setDesc("Include author information in converted callouts (placeholder for future feature)").addToggle((toggle) => toggle.setValue(this.plugin.settings.includeCommentAuthor).onChange(async (value) => {
+      this.plugin.settings.includeCommentAuthor = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Include comment timestamp").setDesc("Include timestamp information in converted callouts (placeholder for future feature)").addToggle((toggle) => toggle.setValue(this.plugin.settings.includeCommentTimestamp).onChange(async (value) => {
+      this.plugin.settings.includeCommentTimestamp = value;
+      await this.plugin.saveSettings();
+    }));
+    const instructionsEl = containerEl.createEl("div", { cls: "print-mode-instructions" });
+    instructionsEl.createEl("h4", { text: "How to use Print Mode:" });
+    const instructionsList = instructionsEl.createEl("ol");
+    instructionsList.createEl("li", { text: 'Click the print icon in the Comments panel or use the command "Activate Print Mode"' });
+    instructionsList.createEl("li", { text: "Preview how your document will look with comments converted to callouts" });
+    instructionsList.createEl("li", { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
+    instructionsList.createEl("li", { text: "Your original document remains unchanged - comments are converted temporarily" });
   }
 };

@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-comments-manager",
+  "name": "obsidian-footnotes-manager",
   "version": "1.0.0",
-  "description": "A plugin to manage comments in Obsidian",
+  "description": "A plugin to manage footnotes in Obsidian",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

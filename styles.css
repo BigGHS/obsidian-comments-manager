@@ -1,5 +1,5 @@
 /*
-Comments Manager Beta - Enhanced with Print Mode functionality
+Comments Manager Beta - Enhanced with Print Mode functionality and Lucide icons
 */
 
 /* Panel Styles */
@@ -58,14 +58,22 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	margin-right: 6px;
 	cursor: pointer;
 	user-select: none;
-	font-size: 10px;
 	color: var(--text-muted);
-	min-width: 12px;
+	min-width: 16px;
+	height: 16px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 	transition: color 0.1s ease;
 }
 
 .comment-collapse-icon:hover {
 	color: var(--text-normal);
+}
+
+.comment-collapse-icon svg {
+	width: 12px;
+	height: 12px;
 }
 
 .comment-header-text {
@@ -167,6 +175,7 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	gap: 4px;
 	justify-content: flex-end;
 	margin-top: 4px;
+	flex-wrap: wrap;
 }
 
 .comment-btn {
@@ -176,6 +185,9 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	border-radius: 3px;
 	cursor: pointer;
 	transition: all 0.1s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .comment-save-btn {
@@ -202,7 +214,7 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	color: var(--text-error);
 	border-color: var(--background-modifier-border);
 	font-weight: bold;
-	width: 20px;
+	width: 24px;
 	height: 20px;
 	padding: 0;
 	display: flex;
@@ -213,6 +225,11 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 .comment-delete-btn:hover {
 	background-color: var(--background-modifier-error);
 	border-color: var(--text-error);
+}
+
+.comment-delete-btn svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Title Row and Controls */
@@ -248,7 +265,6 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.1s ease;
-	font-size: 14px;
 }
 
 .print-mode-btn:hover:not(:disabled) {
@@ -265,6 +281,11 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 .print-mode-btn:active:not(:disabled) {
 	background: var(--background-modifier-active);
 	transform: translateY(1px);
+}
+
+.print-mode-btn svg {
+	width: 16px;
+	height: 16px;
 }
 
 /* Toggle Button Styles */
@@ -299,13 +320,15 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 }
 
 .comments-toggle-icon {
-	font-size: 18px;
-	font-weight: bold;
-	line-height: 1;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: var(--text-muted);
+}
+
+.comments-toggle-icon svg {
+	width: 16px;
+	height: 16px;
 }
 
 .comments-toggle-btn:hover .comments-toggle-icon {
@@ -355,8 +378,6 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	color: var(--text-muted);
 	cursor: pointer;
 	border-radius: 2px;
-	font-size: 14px;
-	font-weight: bold;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -366,6 +387,11 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 .comments-clear-search:hover {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
+}
+
+.comments-clear-search svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Search highlighting styles */
@@ -388,6 +414,9 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	cursor: pointer;
 	transition: all 0.1s ease;
 	white-space: nowrap;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .comments-control-btn:hover:not(:disabled) {
@@ -500,59 +529,6 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	line-height: 1.4;
 }
 
-/* Responsive adjustments for smaller screens */
-@media (max-width: 300px) {
-	.comments-title-row {
-		flex-direction: column;
-		align-items: center;
-		gap: 4px;
-	}
-	
-	.comments-title {
-		text-align: center;
-	}
-	
-	.comments-controls {
-		justify-content: center;
-	}
-	
-	.print-mode-buttons {
-		flex-direction: column;
-	}
-	
-	.print-mode-buttons button {
-		width: 100%;
-	}
-}
-
-/* Hover effects for better UX */
-.print-mode-btn:hover {
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.comments-toggle-btn:hover {
-	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Focus styles for accessibility */
-.print-mode-btn:focus,
-.comments-toggle-btn:focus,
-.comments-search-input:focus {
-	outline: 2px solid var(--interactive-accent);
-	outline-offset: 2px;
-}
-
-/* Animation for the print mode button */
-@keyframes printPulse {
-	0% { transform: scale(1); }
-	50% { transform: scale(1.05); }
-	100% { transform: scale(1); }
-}
-
-.print-mode-btn:active {
-	animation: printPulse 0.2s ease-in-out;
-}
-
 /* Convert to Callout button styles */
 .comment-convert-btn {
 	background-color: var(--background-secondary);
@@ -565,7 +541,6 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 12px;
 }
 
 .comment-convert-btn:hover {
@@ -578,13 +553,9 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 	transform: translateY(0);
 }
 
-/* Update comment actions layout to accommodate new button */
-.comment-actions {
-	display: flex;
-	gap: 4px;
-	justify-content: flex-end;
-	margin-top: 4px;
-	flex-wrap: wrap;
+.comment-convert-btn svg {
+	width: 14px;
+	height: 14px;
 }
 
 /* Comment Conversion Modal Styles */
@@ -689,4 +660,57 @@ Comments Manager Beta - Enhanced with Print Mode functionality
 
 .conversion-modal-buttons button:not(.mod-cta):hover {
 	background-color: var(--background-modifier-hover);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 300px) {
+	.comments-title-row {
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+	}
+	
+	.comments-title {
+		text-align: center;
+	}
+	
+	.comments-controls {
+		justify-content: center;
+	}
+	
+	.print-mode-buttons {
+		flex-direction: column;
+	}
+	
+	.print-mode-buttons button {
+		width: 100%;
+	}
+}
+
+/* Hover effects for better UX */
+.print-mode-btn:hover {
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.comments-toggle-btn:hover {
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Focus styles for accessibility */
+.print-mode-btn:focus,
+.comments-toggle-btn:focus,
+.comments-search-input:focus {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: 2px;
+}
+
+/* Animation for the print mode button */
+@keyframes printPulse {
+	0% { transform: scale(1); }
+	50% { transform: scale(1.05); }
+	100% { transform: scale(1); }
+}
+
+.print-mode-btn:active {
+	animation: printPulse 0.2s ease-in-out;
 }

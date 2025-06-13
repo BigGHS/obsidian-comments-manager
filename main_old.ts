@@ -11,8 +11,7 @@ import {
 	TFile,
 	EditorPosition,
 	Notice,
-	Modal,
-	setIcon
+	Modal
 } from 'obsidian';
 
 // Plugin settings interface
@@ -320,9 +319,9 @@ export default class CommentsManagerPlugin extends Plugin {
 		);
 
 		// Add ribbon icon to toggle comments panel
-                this.addRibbonIcon('message-square', 'Toggle Comments Panel', () => {
-                        this.activateView();
-                });
+		this.addRibbonIcon('percent', 'Toggle Comments Panel', () => {
+			this.activateView();
+		});
 
 		// Add command to toggle comments panel
 		this.addCommand({
@@ -868,11 +867,11 @@ class CommentsView extends ItemView {
 		const controlsContainer = titleRow.createEl('div', { cls: 'comments-controls' });
 		
 		// Print Mode button
-                const printModeBtn = controlsContainer.createEl('button', {
-                         cls: 'comments-control-btn print-mode-btn',
-                         attr: { title: 'Convert comments to callouts for printing' }
-                 });
-                 setIcon(printModeBtn, 'printer');
+		const printModeBtn = controlsContainer.createEl('button', { 
+			cls: 'comments-control-btn print-mode-btn',
+			attr: { title: 'Convert comments to callouts for printing' }
+		});
+		printModeBtn.innerHTML = '🖨️';
 		
 		// Toggle button for collapse/expand all
 		const toggleAllBtn = controlsContainer.createEl('button', { 
@@ -880,8 +879,8 @@ class CommentsView extends ItemView {
 			attr: { title: 'Toggle collapse/expand all sections' }
 		});
 		
-                const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
-                setIcon(toggleIcon, this.isCollapsed ? 'plus' : 'minus');
+		const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
+		toggleIcon.innerHTML = this.isCollapsed ? '+' : '-';
 		
 		// Add search container below the title row
 		const searchContainer = header.createEl('div', { cls: 'comments-search-container' });
@@ -894,11 +893,11 @@ class CommentsView extends ItemView {
 			}
 		});
 		
-                const clearSearchBtn = searchContainer.createEl('button', {
-                        cls: 'comments-clear-search',
-                        attr: { title: 'Clear search' }
-                });
-                setIcon(clearSearchBtn, 'x');
+		const clearSearchBtn = searchContainer.createEl('button', {
+			cls: 'comments-clear-search',
+			attr: { title: 'Clear search' }
+		});
+		clearSearchBtn.innerHTML = '×';
 
 		// Get active file content with a small delay to ensure proper focus
 		setTimeout(() => {
@@ -1093,10 +1092,10 @@ class CommentsView extends ItemView {
 						r.group.header.level === group.header!.level && 
 						r.group.header.text === group.header!.text
 					);
-                                        if (rendered) {
-                                                setIcon(rendered.collapseIcon as HTMLElement, group.isCollapsed ? 'chevron-right' : 'chevron-down');
-                                                rendered.contentElement.style.display = group.isCollapsed ? 'none' : 'block';
-                                        }
+					if (rendered) {
+						rendered.collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
+						rendered.contentElement.style.display = group.isCollapsed ? 'none' : 'block';
+					}
 				}
 			}
 			
@@ -1184,15 +1183,15 @@ class CommentsView extends ItemView {
 		
 		const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
 		
-                const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
-                const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
-
-                if (hasChildren) {
-                        setIcon(collapseIcon, group.isCollapsed ? 'chevron-right' : 'chevron-down');
-                        collapseIcon.style.visibility = 'visible';
-                } else {
-                        collapseIcon.style.visibility = 'hidden';
-                }
+		const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
+		const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
+		
+		if (hasChildren) {
+			collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
+			collapseIcon.style.visibility = 'visible';
+		} else {
+			collapseIcon.style.visibility = 'hidden';
+		}
 		
 		const headerText = headerEl.createEl('span', { cls: 'comment-header-text' });
 		if (group.header) {
@@ -1281,14 +1280,14 @@ class CommentsView extends ItemView {
 	private toggleGroupCollapse(group: CommentGroup, icon: Element, content: HTMLElement) {
 		group.isCollapsed = !group.isCollapsed;
 		
-                if (group.isCollapsed) {
-                        setIcon(icon as HTMLElement, 'chevron-right');
-                        content.style.display = 'none';
-                } else {
-                        setIcon(icon as HTMLElement, 'chevron-down');
-                        content.style.display = 'block';
-                        this.hasManualExpansions = true;
-                }
+		if (group.isCollapsed) {
+			icon.textContent = '▶';
+			content.style.display = 'none';
+		} else {
+			icon.textContent = '▼';
+			content.style.display = 'block';
+			this.hasManualExpansions = true;
+		}
 
 		if (group.isCollapsed && group.children) {
 			this.collapseAllChildren(group);
@@ -1316,15 +1315,15 @@ class CommentsView extends ItemView {
 		this.debug('toggleAllGroups completed, new state:', this.isCollapsed);
 	}
 	
-        private updateToggleButton(toggleIcon: HTMLElement) {
-                if (this.isCollapsed) {
-                        setIcon(toggleIcon, 'plus');
-                        toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
-                } else {
-                        setIcon(toggleIcon, 'minus');
-                        toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
-                }
-        }
+	private updateToggleButton(toggleIcon: HTMLElement) {
+		if (this.isCollapsed) {
+			toggleIcon.innerHTML = '+';
+			toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
+		} else {
+			toggleIcon.innerHTML = '-';
+			toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
+		}
+	}
 
 	private collapseAllGroups(allGroups: CommentGroup[]) {
 		this.debug('Collapsing all groups to top level overview');
@@ -1333,29 +1332,29 @@ class CommentsView extends ItemView {
 			const hasContent = (rendered.group.children && rendered.group.children.length > 0) || rendered.group.comments.length > 0;
 			
 			if (hasContent) {
-                                rendered.group.isCollapsed = true;
-                                setIcon(rendered.collapseIcon as HTMLElement, 'chevron-right');
-                                rendered.contentElement.style.display = 'none';
+				rendered.group.isCollapsed = true;
+				rendered.collapseIcon.textContent = '▶';
+				rendered.contentElement.style.display = 'none';
 			}
 		});
 	}
 
 	private expandAllGroups(allGroups: CommentGroup[]) {
-	    this.debug('Expanding all groups');
-	    this.renderedGroups.forEach(rendered => {
-	        rendered.group.isCollapsed = false;
-	        setIcon(rendered.collapseIcon as HTMLElement, 'chevron-down');
-	        rendered.contentElement.style.display = 'block';
-	    });
+		this.debug('Expanding all groups');
+		this.renderedGroups.forEach(rendered => {
+			rendered.group.isCollapsed = false;
+			rendered.collapseIcon.textContent = '▼';
+			rendered.contentElement.style.display = 'block';
+		});
 	}
 
 	private collapseAllChildren(group: CommentGroup) {
-	    if (group.children) {
-	        group.children.forEach((child: CommentGroup) => {
-	            child.isCollapsed = true;
-	            this.collapseAllChildren(child);
-	        });
-	    }
+		if (group.children) {
+			group.children.forEach((child: CommentGroup) => {
+				child.isCollapsed = true;
+				this.collapseAllChildren(child);
+			});
+		}
 	}
 
 	private createCommentElement(comment: CommentData, container: Element) {
@@ -1413,18 +1412,18 @@ class CommentsView extends ItemView {
 		cancelBtn.style.display = 'none';
 
 		// Convert to Callout button
-                const convertBtn = actionsEl.createEl('button', {
-                        cls: 'comment-btn comment-convert-btn',
-                        attr: { title: 'Convert to callout' }
-                });
-                setIcon(convertBtn, 'pencil');
+		const convertBtn = actionsEl.createEl('button', { 
+			text: '📝', 
+			cls: 'comment-btn comment-convert-btn',
+			attr: { title: 'Convert to callout' }
+		});
 
 		// Delete button
-                const deleteBtn = actionsEl.createEl('button', {
-                        cls: 'comment-btn comment-delete-btn',
-                        attr: { title: 'Delete comment' }
-                });
-                setIcon(deleteBtn, 'trash');
+		const deleteBtn = actionsEl.createEl('button', { 
+			text: '×', 
+			cls: 'comment-btn comment-delete-btn',
+			attr: { title: 'Delete comment' }
+		});
 		convertBtn.addEventListener('click', (e) => {
 			e.stopPropagation();
 			
@@ -1976,7 +1975,7 @@ class CommentsManagerSettingTab extends PluginSettingTab {
 		const instructionsEl = containerEl.createEl('div', { cls: 'print-mode-instructions' });
 		instructionsEl.createEl('h4', { text: 'How to use Print Mode:' });
 		const instructionsList = instructionsEl.createEl('ol');
-		instructionsList.createEl('li', { text: 'Click the print icon in the Comments panel or use the command "Activate Print Mode"' });
+		instructionsList.createEl('li', { text: 'Click the 🖨️ button in the Comments panel or use the command "Activate Print Mode"' });
 		instructionsList.createEl('li', { text: 'Preview how your document will look with comments converted to callouts' });
 		instructionsList.createEl('li', { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
 		instructionsList.createEl('li', { text: 'Your original document remains unchanged - comments are converted temporarily' });
