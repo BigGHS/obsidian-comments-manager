@@ -58,6 +58,7 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 .view-mode-btn:hover {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
+	transform: scale(1.05);
 }
 
 .view-mode-btn.active {
@@ -160,14 +161,17 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	margin-right: 6px;
 	cursor: pointer;
 	user-select: none;
-	font-size: 10px;
 	color: var(--text-muted);
-	min-width: 12px;
+	min-width: 16px;
 	transition: color 0.1s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .comment-collapse-icon:hover {
 	color: var(--text-normal);
+	transform: scale(1.1);
 }
 
 .comment-header-text {
@@ -381,7 +385,6 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	border-radius: 4px;
 	cursor: pointer;
 	transition: all 0.1s ease;
-	font-size: 14px;
 }
 
 .print-mode-btn:hover:not(:disabled) {
@@ -432,9 +435,6 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 }
 
 .comments-toggle-icon {
-	font-size: 18px;
-	font-weight: bold;
-	line-height: 1;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -451,9 +451,22 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	margin-bottom: 8px;
 }
 
+/* Search icon styling */
+.comments-search-icon {
+	position: absolute;
+	left: 8px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: var(--text-muted);
+	pointer-events: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
 .comments-search-input {
 	width: 100%;
-	padding: 6px 30px 6px 8px;
+	padding: 6px 30px 6px 30px; /* Added left padding for search icon */
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	color: var(--text-normal);
@@ -488,8 +501,6 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	color: var(--text-muted);
 	cursor: pointer;
 	border-radius: 2px;
-	font-size: 14px;
-	font-weight: bold;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -853,4 +864,62 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	background: var(--interactive-accent);
 	color: var(--text-on-accent);
 	transform: scale(1.05);
+}
+
+/* Delete button icon styling */
+.comment-delete-btn {
+	background-color: var(--background-secondary);
+	color: var(--text-error);
+	border-color: var(--background-modifier-border);
+	width: 24px;
+	height: 20px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.comment-delete-btn:hover {
+	background-color: var(--background-modifier-error);
+	border-color: var(--text-error);
+	transform: scale(1.1);
+}
+
+/* Convert button icon styling */
+.comment-convert-btn {
+	background-color: var(--background-secondary);
+	color: var(--color-accent);
+	border-color: var(--background-modifier-border);
+	width: 24px;
+	height: 20px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.comment-convert-btn:hover {
+	background-color: var(--background-modifier-hover);
+	border-color: var(--color-accent);
+	transform: translateY(-1px);
+}
+
+/* Active states for buttons */
+.view-mode-btn:active,
+.print-mode-btn:active,
+.comments-toggle-btn:active {
+	transform: scale(0.95);
+}
+
+/* Ensure proper icon sizing for all setIcon elements */
+.comment-collapse-icon svg,
+.comments-toggle-icon svg,
+.view-mode-btn svg,
+.print-mode-btn svg,
+.comments-search-icon svg,
+.comments-clear-search svg,
+.comment-delete-btn svg,
+.comment-convert-btn svg {
+	width: 16px;
+	height: 16px;
 }

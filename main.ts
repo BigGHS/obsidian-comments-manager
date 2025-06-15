@@ -11,7 +11,8 @@ import {
 	TFile,
 	EditorPosition,
 	Notice,
-	Modal
+	Modal,
+	setIcon
 } from 'obsidian';
 
 // Plugin settings interface
@@ -70,7 +71,7 @@ interface CommentGroup {
 // Interface for tracking rendered groups
 interface RenderedGroup {
 	group: CommentGroup;
-	collapseIcon: Element;
+	collapseIcon: HTMLElement;
 	contentElement: HTMLElement;
 }
 
@@ -383,6 +384,11 @@ export default class CommentsManagerPlugin extends Plugin {
 				this.activateView();
 			});
 		}
+		
+		// Add ribbon icon to toggle comments panel
+		this.addRibbonIcon('message-square', 'Toggle Comments Panel', () => {
+			this.activateView();
+		});
 	}
 
 	activatePrintMode() {
@@ -875,59 +881,56 @@ class CommentsView extends ItemView {
 		
 		// View mode toggle buttons
 		const viewModeContainer = controlsContainer.createEl('div', { cls: 'view-mode-toggle' });
-		
-		const outlinerBtn = viewModeContainer.createEl('button', {
-			cls: `view-mode-btn ${this.currentViewMode === 'outliner' ? 'active' : ''}`,
-			attr: { title: 'Outliner view (grouped by headers)' }
-		});
-		// Using Lucide icon for outliner
-		outlinerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>';
-		
-		const listBtn = viewModeContainer.createEl('button', {
-			cls: `view-mode-btn ${this.currentViewMode === 'list' ? 'active' : ''}`,
-			attr: { title: 'List view (flat list of comments)' }
-		});
-		// Using Lucide icon for list
-		listBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
-		
-		// Print Mode button
-		const printModeBtn = controlsContainer.createEl('button', { 
-			cls: 'comments-control-btn print-mode-btn',
-			attr: { title: 'Convert comments to callouts for printing' }
-		});
-		// Using Lucide icon for printer
-		printModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
-		
-		// Toggle button for collapse/expand all (only visible in outliner mode)
-		const toggleAllBtn = controlsContainer.createEl('button', { 
-			cls: 'comments-toggle-btn',
-			attr: { title: 'Toggle collapse/expand all sections' }
-		});
-		
-		const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
-		toggleIcon.innerHTML = this.isCollapsed ? '+' : '-';
-		
-		// Show/hide toggle button based on view mode
-		if (this.currentViewMode === 'list') {
-			toggleAllBtn.style.display = 'none';
-		}
-		
-		// Add search container below the title row
-		const searchContainer = header.createEl('div', { cls: 'comments-search-container' });
-		const searchInput = searchContainer.createEl('input', {
-			type: 'text',
-			cls: 'comments-search-input',
-			attr: { 
-				placeholder: 'Search comments...',
-				spellcheck: 'false'
-			}
-		});
-		
-		const clearSearchBtn = searchContainer.createEl('button', {
-			cls: 'comments-clear-search',
-			attr: { title: 'Clear search' }
-		});
-		clearSearchBtn.innerHTML = '×';
+	
+			const outlinerBtn = viewModeContainer.createEl('button', {
+				cls: `view-mode-btn ${this.currentViewMode === 'outliner' ? 'active' : ''}`,
+				attr: { title: 'Outliner view (grouped by headers)' }
+			});
+			setIcon(outlinerBtn, 'layout-grid'); // or 'network' for hierarchy look
+	
+			const listBtn = viewModeContainer.createEl('button', {
+				cls: `view-mode-btn ${this.currentViewMode === 'list' ? 'active' : ''}`,
+				attr: { title: 'List view (flat list of comments)' }
+			});
+			setIcon(listBtn, 'list');
+	
+			// Print Mode button
+			const printModeBtn = controlsContainer.createEl('button', { 
+				cls: 'comments-control-btn print-mode-btn',
+				attr: { title: 'Convert comments to callouts for printing' }
+			});
+			setIcon(printModeBtn, 'printer');
+	
+			// Toggle button for collapse/expand all
+			const toggleAllBtn = controlsContainer.createEl('button', { 
+				cls: 'comments-toggle-btn',
+				attr: { title: 'Toggle collapse/expand all sections' }
+			});
+	
+			const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
+			setIcon(toggleIcon, this.isCollapsed ? 'plus' : 'minus');
+
+			// Search container
+			const searchContainer = header.createEl('div', { cls: 'comments-search-container' });
+	
+			// Search icon
+			const searchIconEl = searchContainer.createEl('span', { cls: 'comments-search-icon' });
+			setIcon(searchIconEl, 'search');
+	
+			const searchInput = searchContainer.createEl('input', {
+				type: 'text',
+				cls: 'comments-search-input',
+				attr: { 
+					placeholder: 'Search comments...',
+					spellcheck: 'false'
+				}
+			});
+	
+			const clearSearchBtn = searchContainer.createEl('button', {
+				cls: 'comments-clear-search',
+				attr: { title: 'Clear search' }
+			});
+			setIcon(clearSearchBtn, 'x');
 
 		// View mode button event handlers
 		outlinerBtn.onclick = (e) => {
@@ -1147,7 +1150,7 @@ class CommentsView extends ItemView {
 		}
 	}
 
-	private renderOutlinerView(comments: CommentData[], headers: HeaderData[], commentsList: Element, currentStates: Map<string, boolean>) {
+	private renderOutlinerView(comments: CommentData[], headers: HeaderData[], commentsList: HTMLElement, currentStates: Map<string, boolean>) {
 		const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
 		
 		commentGroups.forEach(group => {
@@ -1165,7 +1168,7 @@ class CommentsView extends ItemView {
 		this.debug('Initial collapsed state:', this.isCollapsed, 'hasManualExpansions:', this.hasManualExpansions);
 	}
 
-	private renderListView(comments: CommentData[], commentsList: Element) {
+	private renderListView(comments: CommentData[], commentsList: HTMLElement) {
 		this.debug('Rendering list view with', comments.length, 'comments');
 		
 		// Sort comments by their position in the document
@@ -1257,7 +1260,7 @@ class CommentsView extends ItemView {
 			this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
 		}
 
-		private filterListComments(commentsList: Element, comments: CommentData[], searchTerm: string) {
+		private filterListComments(commentsList: HTMLElement, comments: CommentData[], searchTerm: string) {
 			commentsList.empty();
 		
 			if (!searchTerm) {
@@ -1466,24 +1469,24 @@ class CommentsView extends ItemView {
 					const wasExpanded = states.get(key);
 					if (wasExpanded !== undefined) {
 						group.isCollapsed = !wasExpanded;
-					
+			
 						const rendered = this.renderedGroups.find(r => 
 							r.group.header && 
 							r.group.header.level === group.header!.level && 
 							r.group.header.text === group.header!.text
 						);
 						if (rendered) {
-							rendered.collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
+							setIcon(rendered.collapseIcon as HTMLElement, group.isCollapsed ? 'chevron-right' : 'chevron-down');
 							rendered.contentElement.style.display = group.isCollapsed ? 'none' : 'block';
 						}
 					}
 				}
-			
+	
 				if (group.children) {
 					group.children.forEach(restoreGroup);
 				}
 			};
-		
+
 			groups.forEach(restoreGroup);
 		}
 
@@ -1503,7 +1506,7 @@ class CommentsView extends ItemView {
 			return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 		}
 
-		private filterComments(commentsList: Element, commentGroups: CommentGroup[], searchTerm: string) {
+		private filterComments(commentsList: HTMLElement, commentGroups: CommentGroup[], searchTerm: string) {
 			commentsList.empty();
 		
 			if (!searchTerm) {
@@ -1558,20 +1561,21 @@ class CommentsView extends ItemView {
 		}
 		
 		private renderCommentGroup(group: CommentGroup, container: Element, depth: number) {
-				const headerSection = container.createEl('div', { cls: 'comment-header-section' });
-				headerSection.style.marginLeft = `${depth * 12}px`;
-		
-				const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
-		
-				const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
-				const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
-		
-				if (hasChildren) {
-					collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
-					collapseIcon.style.visibility = 'visible';
-				} else {
-					collapseIcon.style.visibility = 'hidden';
-				}
+			const headerSection = container.createEl('div', { cls: 'comment-header-section' });
+			headerSection.style.marginLeft = `${depth * 12}px`;
+
+			const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
+
+			const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
+			const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
+
+			if (hasChildren) {
+				// Use setIcon with Lucide chevron icons
+				setIcon(collapseIcon, group.isCollapsed ? 'chevron-right' : 'chevron-down');
+				collapseIcon.style.visibility = 'visible';
+			} else {
+				collapseIcon.style.visibility = 'hidden';
+			}
 		
 				const headerText = headerEl.createEl('span', { cls: 'comment-header-text' });
 				if (group.header) {
@@ -1657,14 +1661,14 @@ class CommentsView extends ItemView {
 				return total;
 			}
 
-			private toggleGroupCollapse(group: CommentGroup, icon: Element, content: HTMLElement) {
+			private toggleGroupCollapse(group: CommentGroup, icon: HTMLElement, content: HTMLElement) {
 				group.isCollapsed = !group.isCollapsed;
-		
+
 				if (group.isCollapsed) {
-					icon.textContent = '▶';
+					setIcon(icon, 'chevron-right');
 					content.style.display = 'none';
 				} else {
-					icon.textContent = '▼';
+					setIcon(icon, 'chevron-down');
 					content.style.display = 'block';
 					this.hasManualExpansions = true;
 				}
@@ -1672,7 +1676,7 @@ class CommentsView extends ItemView {
 				if (group.isCollapsed && group.children) {
 					this.collapseAllChildren(group);
 				}
-		
+
 				this.debug('Group toggled, hasManualExpansions:', this.hasManualExpansions);
 			}
 
@@ -1697,33 +1701,33 @@ class CommentsView extends ItemView {
 	
 			private updateToggleButton(toggleIcon: HTMLElement) {
 				if (this.isCollapsed) {
-					toggleIcon.innerHTML = '+';
+					setIcon(toggleIcon, 'plus');
 					toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
 				} else {
-					toggleIcon.innerHTML = '-';
+					setIcon(toggleIcon, 'minus');
 					toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
 				}
 			}
 
 			private collapseAllGroups(allGroups: CommentGroup[]) {
 				this.debug('Collapsing all groups to top level overview');
-		
+
 				this.renderedGroups.forEach(rendered => {
 					const hasContent = (rendered.group.children && rendered.group.children.length > 0) || rendered.group.comments.length > 0;
-			
+
 					if (hasContent) {
 						rendered.group.isCollapsed = true;
-						rendered.collapseIcon.textContent = '▶';
+						setIcon(rendered.collapseIcon, 'chevron-right');
 						rendered.contentElement.style.display = 'none';
 					}
 				});
 			}
-
+			
 			private expandAllGroups(allGroups: CommentGroup[]) {
 				this.debug('Expanding all groups');
 				this.renderedGroups.forEach(rendered => {
 					rendered.group.isCollapsed = false;
-					rendered.collapseIcon.textContent = '▼';
+					setIcon(rendered.collapseIcon, 'chevron-down');
 					rendered.contentElement.style.display = 'block';
 				});
 			}
@@ -1793,18 +1797,17 @@ class CommentsView extends ItemView {
 
 				// Convert to Callout button
 				const convertBtn = actionsEl.createEl('button', { 
-					cls: 'comment-btn comment-convert-btn',
-					attr: { title: 'Convert to callout' }
-				});
-				// Using Lucide icon for edit/convert
-				convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+						cls: 'comment-btn comment-convert-btn',
+						attr: { title: 'Convert to callout' }
+					});
+					setIcon(convertBtn, 'edit');
 
-				// Delete button
-				const deleteBtn = actionsEl.createEl('button', { 
-					text: '×', 
-					cls: 'comment-btn comment-delete-btn',
-					attr: { title: 'Delete comment' }
-				});
+					// Delete button
+					const deleteBtn = actionsEl.createEl('button', { 
+						cls: 'comment-btn comment-delete-btn',
+						attr: { title: 'Delete comment' }
+					});
+					setIcon(deleteBtn, 'trash-2');
 
 				// Set up event handlers
 				this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);

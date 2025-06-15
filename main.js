@@ -256,6 +256,9 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
         this.activateView();
       });
     }
+    this.addRibbonIcon("message-square", "Toggle Comments Panel", () => {
+      this.activateView();
+    });
   }
   activatePrintMode() {
     let activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
@@ -624,27 +627,26 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: `view-mode-btn ${this.currentViewMode === "outliner" ? "active" : ""}`,
       attr: { title: "Outliner view (grouped by headers)" }
     });
-    outlinerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>';
+    (0, import_obsidian.setIcon)(outlinerBtn, "layout-grid");
     const listBtn = viewModeContainer.createEl("button", {
       cls: `view-mode-btn ${this.currentViewMode === "list" ? "active" : ""}`,
       attr: { title: "List view (flat list of comments)" }
     });
-    listBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+    (0, import_obsidian.setIcon)(listBtn, "list");
     const printModeBtn = controlsContainer.createEl("button", {
       cls: "comments-control-btn print-mode-btn",
       attr: { title: "Convert comments to callouts for printing" }
     });
-    printModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+    (0, import_obsidian.setIcon)(printModeBtn, "printer");
     const toggleAllBtn = controlsContainer.createEl("button", {
       cls: "comments-toggle-btn",
       attr: { title: "Toggle collapse/expand all sections" }
     });
     const toggleIcon = toggleAllBtn.createEl("span", { cls: "comments-toggle-icon" });
-    toggleIcon.innerHTML = this.isCollapsed ? "+" : "-";
-    if (this.currentViewMode === "list") {
-      toggleAllBtn.style.display = "none";
-    }
+    (0, import_obsidian.setIcon)(toggleIcon, this.isCollapsed ? "plus" : "minus");
     const searchContainer = header.createEl("div", { cls: "comments-search-container" });
+    const searchIconEl = searchContainer.createEl("span", { cls: "comments-search-icon" });
+    (0, import_obsidian.setIcon)(searchIconEl, "search");
     const searchInput = searchContainer.createEl("input", {
       type: "text",
       cls: "comments-search-input",
@@ -657,7 +659,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comments-clear-search",
       attr: { title: "Clear search" }
     });
-    clearSearchBtn.innerHTML = "\xD7";
+    (0, import_obsidian.setIcon)(clearSearchBtn, "x");
     outlinerBtn.onclick = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -1079,7 +1081,7 @@ var CommentsView = class extends import_obsidian.ItemView {
             (r) => r.group.header && r.group.header.level === group.header.level && r.group.header.text === group.header.text
           );
           if (rendered) {
-            rendered.collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+            (0, import_obsidian.setIcon)(rendered.collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
             rendered.contentElement.style.display = group.isCollapsed ? "none" : "block";
           }
         }
@@ -1152,7 +1154,7 @@ var CommentsView = class extends import_obsidian.ItemView {
     const collapseIcon = headerEl.createEl("span", { cls: "comment-collapse-icon" });
     const hasChildren = group.children && group.children.length > 0 || group.comments.length > 0;
     if (hasChildren) {
-      collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+      (0, import_obsidian.setIcon)(collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
       collapseIcon.style.visibility = "visible";
     } else {
       collapseIcon.style.visibility = "hidden";
@@ -1233,10 +1235,10 @@ var CommentsView = class extends import_obsidian.ItemView {
   toggleGroupCollapse(group, icon, content) {
     group.isCollapsed = !group.isCollapsed;
     if (group.isCollapsed) {
-      icon.textContent = "\u25B6";
+      (0, import_obsidian.setIcon)(icon, "chevron-right");
       content.style.display = "none";
     } else {
-      icon.textContent = "\u25BC";
+      (0, import_obsidian.setIcon)(icon, "chevron-down");
       content.style.display = "block";
       this.hasManualExpansions = true;
     }
@@ -1262,10 +1264,10 @@ var CommentsView = class extends import_obsidian.ItemView {
   }
   updateToggleButton(toggleIcon) {
     if (this.isCollapsed) {
-      toggleIcon.innerHTML = "+";
+      (0, import_obsidian.setIcon)(toggleIcon, "plus");
       toggleIcon.parentElement.setAttribute("title", "Expand all sections");
     } else {
-      toggleIcon.innerHTML = "-";
+      (0, import_obsidian.setIcon)(toggleIcon, "minus");
       toggleIcon.parentElement.setAttribute("title", "Collapse all sections");
     }
   }
@@ -1275,7 +1277,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       const hasContent = rendered.group.children && rendered.group.children.length > 0 || rendered.group.comments.length > 0;
       if (hasContent) {
         rendered.group.isCollapsed = true;
-        rendered.collapseIcon.textContent = "\u25B6";
+        (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-right");
         rendered.contentElement.style.display = "none";
       }
     });
@@ -1284,7 +1286,7 @@ var CommentsView = class extends import_obsidian.ItemView {
     this.debug("Expanding all groups");
     this.renderedGroups.forEach((rendered) => {
       rendered.group.isCollapsed = false;
-      rendered.collapseIcon.textContent = "\u25BC";
+      (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-down");
       rendered.contentElement.style.display = "block";
     });
   }
@@ -1342,12 +1344,12 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comment-btn comment-convert-btn",
       attr: { title: "Convert to callout" }
     });
-    convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    (0, import_obsidian.setIcon)(convertBtn, "edit");
     const deleteBtn = actionsEl.createEl("button", {
-      text: "\xD7",
       cls: "comment-btn comment-delete-btn",
       attr: { title: "Delete comment" }
     });
+    (0, import_obsidian.setIcon)(deleteBtn, "trash-2");
     this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
   }
   updateCommentInEditor(comment, newText) {
