@@ -6,6 +6,6 @@ dist/
 .vscode/
 .idea/" > .gitignore
 *.txt
-*.zip
+Source code.zip
 main copy.ts
 main_old.ts
