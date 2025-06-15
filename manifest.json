@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-comments-manager",
 	"name": "Comments Manager",
-	"version": "1.2.1",
+	"version": "1.3.0",
 	"minAppVersion": "0.15.0",
-	"description": "Manage comments in your Obsidian notes with a dedicated side panel. Edit, delete, and navigate comments easily. NEW: Print Mode - Convert comments to callouts for PDF export!",
+	"description": "Manage comments in your Obsidian notes with a dedicated side panel. Edit, delete, and navigate comments easily. List or Outline views. Print Mode - Convert comments to callouts for PDF export!",
 	"author": "Graham Smale",
 	"authorUrl": "https://github.com/BigGHS/obsidian-comments-manager",
 	"fundingUrl": "https://buymeacoffee.com/yourusername",

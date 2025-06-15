@@ -3,9 +3,16 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 */
 
 /* Panel Styles */
+/* Add sticky positioning to the comments header */
 .comments-header {
 	padding: 10px;
 	border-bottom: 1px solid var(--background-modifier-border);
+	position: sticky;
+	top: 0;
+	background-color: var(--background-primary);
+	z-index: 10;
+	/* Add a subtle shadow when scrolling */
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .comments-title {

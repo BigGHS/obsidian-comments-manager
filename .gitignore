@@ -5,3 +5,7 @@ echo "node_modules/
 dist/
 .vscode/
 .idea/" > .gitignore
+*.txt
+*.zip
+main copy.ts
+main_old.ts
