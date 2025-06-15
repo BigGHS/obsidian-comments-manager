@@ -1,251 +1,372 @@
 # Comments Manager for Obsidian
 
-A powerful Obsidian plugin that helps you manage and navigate comments in your notes through a dedicated side panel.
+A powerful Obsidian plugin that helps you manage and navigate comments in your notes through a dedicated side panel with dual view modes and advanced features.
 
-## Features
+## ✨ Features
 
-- **📋 Side Panel View**: View all comments in a hierarchical tree structure organized by headers
-- **🔍 Search & Filter**: Quickly find specific comments with real-time search and highlighting
-- **✏️ In-Panel Editing**: Edit comments directly in the side panel or navigate to edit in the document
-- **🗂️ Smart Organization**: Comments are grouped under their nearest preceding header, just like an outline
-- **🔄 Flexible Navigation**: Click comments to jump to their location in the document
-- **⚡ Collapse/Expand**: Individual section control plus global expand/collapse toggle
-- **🎛️ Customizable**: Configure comment prefix, default view state, and startup behavior
-- **💾 State Preservation**: Maintains your manual expansions when navigating between comments
-- **🖨️ Print Mode**: Convert all comments to callouts for PDF export without permanently modifying your files
-- **📝 Individual Conversion**: Convert specific comments to permanent callouts with custom titles
+### 📋 Dual View Modes
+- **Outliner View**: Hierarchical tree structure organized by headers - perfect for understanding document structure
+- **List View**: Flat numbered list in document order - ideal for sequential comment review
+- **Quick Toggle**: Switch between views instantly with dedicated buttons
+- **Saved Preference**: Your view mode choice is remembered across sessions
 
-## Installation
+### 🔍 Advanced Comment Management
+- **Smart Organization**: Comments grouped under their nearest preceding header (outliner mode)
+- **Real-time Search**: Find specific comments with instant filtering and highlighting
+- **In-Panel Editing**: Edit comments directly in the side panel with auto-resize support
+- **Quick Navigation**: Click any comment to jump to its location in the document
+- **Header Navigation**: Click headers to navigate to document sections
 
-### Manual Installation
+### 🖨️ Print Mode
+- **Temporary Conversion**: Convert all comments to visible callouts for PDF export
+- **Safe Operation**: No permanent file modification - easily restore original content
+- **Preview Modal**: See exactly how your document will look before exporting
+- **Context Awareness**: Callouts include header context and line numbers
+- **Perfect for**: Academic papers, document reviews, client presentations
 
+### 📝 Individual Comment Conversion
+- **Selective Conversion**: Convert specific comments to permanent callouts
+- **Custom Titles**: Add meaningful titles like "Important Note", "Question", "TODO"
+- **Smart Defaults**: Automatic context from nearby headers when no title provided
+- **Permanent Change**: Great for making feedback visible or creating action items
+
+### ⚡ Enhanced User Experience
+- **Collapse/Expand Control**: Individual section control plus global toggle (outliner mode)
+- **State Preservation**: Manual expansions maintained when navigating
+- **Multi-line Support**: Full support for complex, multi-line comments
+- **Customizable Settings**: Configure comment prefix, startup behavior, and more
+- **Modern UI**: Clean interface with Lucide icons throughout
+
+## 🚀 Installation
+
+### Method 1: Manual Installation
 1. Download the latest release files (`main.js`, `manifest.json`, `styles.css`)
 2. Create a folder called `obsidian-comments-manager` in your vault's `.obsidian/plugins/` directory
 3. Place the downloaded files in this folder
 4. Reload Obsidian and enable the plugin in Settings → Community Plugins
-5. Or use obsidian BRAT plugin with github link to this repo
 
-### Development Installation
+### Method 2: BRAT Plugin
+1. Install the BRAT plugin if you haven't already
+2. Add this repository URL: `https://github.com/BigGHS/obsidian-comments-manager`
+3. Enable the plugin in Community Plugins
 
-1. Clone this repository into your vault's `.obsidian/plugins/` directory:
-   ```bash
-   git clone https://github.com/BigGHS/obsidian-comments-manager.git
-   ```
-2. Navigate to the plugin directory:
-   ```bash
-   cd obsidian-comments-manager
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Build the plugin:
-   ```bash
-   npm run build
-   ```
-5. Reload Obsidian and enable the plugin
-
-## Usage
-
-### Basic Usage
-
-1. **Open Comments Panel**: Click the `%` icon in the ribbon or use the command palette (`Ctrl+P` → "Toggle Comments Panel")
-2. **Add Comments**: Use the command "Insert comment" or manually add comments with your configured prefix (default: `%% Your comment %%`)
-3. **Navigate**: Click on any comment or header in the panel to jump to that location in your document
-4. **Edit**: Click directly on comment text to edit in-place, or click the comment area to edit in the document
-
-### Comment Format
-
-By default, comments use the format:
-```
-%% This is a comment %%
-```
-
-You can customize the comment prefix in the plugin settings.
-
-### Panel Controls
-
-- **🖨️ Print Mode Button**: Convert all comments to callouts for PDF export
-- **Toggle Button** (`+`/`-`): Expand or collapse all sections globally
-- **Section Icons** (`▶`/`▼`): Expand or collapse individual sections
-- **Search Box**: Filter comments in real-time
-- **Comment Actions**: Save, Cancel, Convert (📝), or Delete when managing comments
-
-### Print Mode
-
-Print Mode allows you to temporarily convert hidden comments to visible callouts for PDF export without permanently modifying your files.
-
-#### How to Use Print Mode:
-
-1. **Click the 🖨️ button** in the Comments panel or use the command "Activate Print Mode"
-2. **Preview** how your document will look with comments converted to callouts
-3. **Click "Export to PDF"** to trigger PDF export with converted comments
-4. **Your original document remains unchanged** - comments are converted temporarily
-5. **Click the restoration notice** when you're done to restore the original content
-
-#### Print Mode Features:
-
-- **Safe Operation**: No permanent file modification
-- **Preview Modal**: See exactly how comments will appear as callouts
-- **Context Awareness**: Callouts include header context and line numbers
-- **Manual Control**: You decide when to restore the original content
-- **Perfect for**: Academic papers, document reviews, sharing annotated content
-
-### Individual Comment Conversion
-
-Convert specific comments to permanent callouts with custom titles.
-
-#### How to Convert Individual Comments:
-
-1. **Click the 📝 button** next to any comment in the panel
-2. **Enter a custom title** for the callout (or leave blank for "Comment")
-3. **Confirm the conversion** - this permanently replaces the comment with a callout
-4. **The comment becomes visible** in both the editor and exported documents
-
-#### Conversion Features:
-
-- **Custom Titles**: Name your callouts with meaningful titles like "Important Note", "Question", "TODO"
-- **Permanent Change**: Unlike Print Mode, these conversions are saved to your file
-- **Smart Defaults**: If no title is provided, uses "Comment" or context from nearby headers
-- **Confirmation Dialog**: Prevents accidental conversions
-- **Perfect for**: Making specific feedback visible, highlighting important notes, creating actionable items
-
-### Navigation Behavior
-
-- **Comment Text**: Click to edit in-place in the panel
-- **Comment Area**: Click to navigate to the comment location in the document
-- **Headers**: Click to jump to that header in the document
-- **Manual Expansions**: Your expanded sections are preserved when navigating
-
-## Settings
-
-Access settings via Settings → Comments Manager:
-
-### General Settings
-- **Comment Prefix**: Characters used to mark comments (default: `%%`)
-- **Open Panel on Startup**: Automatically open the comments panel when Obsidian starts
-- **Default Collapsed View**: Start with the panel in collapsed state (showing only headers)
-- **Debug Mode**: Enable console logging for troubleshooting
-
-### Print Mode Settings
-- **Callout Type for Print Mode**: The type of callout to use when converting comments (e.g., comment, note, info)
-- **Include Comment Author**: Include author information in converted callouts (placeholder for future feature)
-- **Include Comment Timestamp**: Include timestamp information in converted callouts (placeholder for future feature)
-
-## Commands
-
-The plugin adds several commands accessible via the command palette (`Ctrl+P`):
-
-- **Toggle Comments Panel**: Open/close the comments side panel
-- **Insert Comment**: Add a new comment at the cursor position
-- **Activate Print Mode**: Convert all comments to callouts for PDF export
-
-## Use Cases
-
-### Academic Writing
-- **Hidden Comments**: Keep research notes and citations as hidden comments during writing
-- **Print Mode**: Convert to visible callouts when sharing with supervisors or for final submission
-- **Individual Conversion**: Make specific references permanent while keeping others hidden
-
-### Document Review
-- **Collaborative Feedback**: Use comments for suggestions and questions
-- **Print Mode**: Generate PDFs with all feedback visible for distribution
-- **Selective Visibility**: Convert critical feedback to permanent callouts
-
-### Project Documentation
-- **Development Notes**: Keep implementation notes as hidden comments
-- **Client Presentations**: Use Print Mode to show relevant comments in client-facing documents
-- **Action Items**: Convert specific comments to permanent "TODO" callouts
-
-## Development
-
-### Building
-
+### Method 3: Development Installation
 ```bash
+# Clone into your vault's plugins directory
+git clone https://github.com/BigGHS/obsidian-comments-manager.git
+
+# Navigate to plugin directory
+cd obsidian-comments-manager
+
+# Install dependencies and build
+npm install
 npm run build
 ```
 
-### Development Mode
+## 📖 Usage Guide
 
+### Basic Usage
+
+1. **Open Comments Panel**: Click the `%` icon in the ribbon or use Command Palette (`Ctrl+P` → "Toggle Comments Panel")
+2. **Add Comments**: Use the command "Insert comment" or manually add: `%% Your comment %%`
+3. **Switch Views**: Use the view toggle buttons at the top of the panel
+4. **Navigate**: Click any comment or header to jump to that location
+5. **Edit**: Click comment text to edit in-place, or click comment area to edit in document
+
+### View Modes
+
+#### 🔲 Outliner View
+- Comments organized in hierarchical tree by headers
+- Collapse/expand individual sections or all at once
+- Shows comment counts per section
+- Perfect for understanding document structure
+- Great for complex documents with multiple sections
+
+#### 📋 List View  
+- Flat numbered list in document order
+- Clean, sequential layout
+- No grouping or hierarchy
+- Ideal for quick comment review
+- Perfect for final editing passes
+
+### Print Mode Workflow
+
+#### For PDF Export:
+1. **Activate**: Click the printer icon or use command "Activate Print Mode"
+2. **Preview**: Review how comments will appear as callouts
+3. **Export**: Click "Export to PDF" to prepare document
+4. **Generate PDF**: Use Obsidian's built-in PDF export (`Ctrl+P`)
+5. **Restore**: Click the notice or use the restore command when done
+
+#### Best Practices:
+- Use for academic papers, reports, and formal documents
+- Great for sharing annotated content with collaborators
+- Perfect for creating documentation with visible feedback
+- Ideal for client presentations with embedded notes
+
+### Individual Comment Conversion
+
+#### When to Use:
+- Make specific feedback permanently visible
+- Convert research notes to action items
+- Highlight critical information for team members
+- Create permanent callouts for important references
+
+#### How to Convert:
+1. **Click Convert Icon**: Use the edit icon next to any comment
+2. **Add Custom Title**: Enter meaningful title or leave blank for default
+3. **Confirm**: Comment becomes a permanent, visible callout
+4. **Result**: Callout appears in both editor and exported documents
+
+### Advanced Features
+
+#### Search & Filtering
+- **Real-time Search**: Type in search box for instant filtering
+- **Works in Both Views**: Search functionality adapts to current view mode
+- **Highlighted Results**: Matching text highlighted in yellow
+- **Clear Function**: One-click search clearing
+
+#### Navigation & Editing
+- **Quick Jump**: Click comments to navigate to source location
+- **Header Navigation**: Click headers to jump to sections (outliner mode)
+- **In-place Editing**: Edit comments without leaving the panel
+- **Auto-resize**: Multi-line comments expand automatically
+- **Keyboard Shortcuts**: 
+  - `Enter`: Save single-line edits
+  - `Ctrl+Enter`: Save multi-line edits  
+  - `Escape`: Cancel editing
+
+## ⚙️ Settings
+
+### General Settings
+- **Comment Prefix**: Characters used to mark comments (default: `%%`)
+- **Open Panel on Startup**: Auto-open panel when Obsidian starts
+- **Default View Mode**: Choose outliner or list as startup view
+- **Default Collapsed View**: Start outliner mode collapsed (headers only)
+- **Debug Mode**: Enable console logging for troubleshooting
+
+### Print Mode Settings
+- **Callout Type**: Type of callout for conversions (e.g., comment, note, info)
+- **Include Author**: Future feature for author information
+- **Include Timestamp**: Future feature for timestamp data
+
+## 🎯 Use Cases
+
+### Academic Writing
+```markdown
+# Research Paper
+
+%% Need to find more sources for this section %%
+## Literature Review
+%% Smith (2023) contradicts Johnson (2022) - need to address %%
+
+## Methodology
+%% Consider adding qualitative methods %%
+```
+- **Hidden Comments**: Keep research notes private during writing
+- **Print Mode**: Convert to visible callouts for supervisor review
+- **Individual Conversion**: Make critical notes permanent
+
+### Document Review & Collaboration
+```markdown
+# Project Proposal
+
+%% Great introduction! Very clear. %%
+## Executive Summary
+%% Consider adding budget overview here %%
+
+%% URGENT: Need legal review before submission %%
+## Implementation Plan
+```
+- **Review Comments**: Add feedback and suggestions
+- **Print Mode**: Generate PDFs with all feedback visible
+- **Selective Visibility**: Convert priority comments to permanent callouts
+
+### Content Creation & Editing
+```markdown
+# Blog Post: AI Trends
+
+%% Update with latest ChatGPT developments %%
+## Introduction
+%% Add hook - maybe start with statistic? %%
+
+%% TODO: Add images and charts %%
+## Key Trends
+```
+- **Editorial Notes**: Track ideas and improvements
+- **List View**: Review all todos sequentially  
+- **Convert to Actions**: Turn comments into permanent task callouts
+
+### Project Documentation
+```markdown
+# API Documentation
+
+%% Version 2.0 will deprecate this endpoint %%
+## Authentication
+%% Add rate limiting examples %%
+
+%% Client feedback: Need more error code examples %%
+## Error Handling
+```
+- **Development Notes**: Track implementation details
+- **Client Presentations**: Use Print Mode for client-facing docs
+- **Action Items**: Convert feedback to permanent improvement notes
+
+## 🎨 Customization
+
+### Comment Format
+Default format: `%% Your comment %%`
+
+Custom prefixes supported:
+- `<!-- Comment -->` for HTML-style
+- `// Comment //` for code-style  
+- `** Comment **` for bold-style
+
+### Callout Types
+Customize callout appearance in Print Mode:
+- `comment` (default) - Standard comment styling
+- `note` - Note-style callouts
+- `info` - Information callouts
+- `warning` - Warning-style callouts
+- `question` - Question callouts
+
+### Keyboard Shortcuts
+Add custom shortcuts in Obsidian settings:
+- Toggle Comments Panel
+- Insert Comment  
+- Activate Print Mode
+
+## 🔧 Commands
+
+Access via Command Palette (`Ctrl+P`):
+
+- **Toggle Comments Panel**: Open/close the comments side panel
+- **Insert Comment**: Add a new comment at cursor position
+- **Activate Print Mode**: Convert all comments to callouts for PDF export
+- **Restore Original Content**: Restore document after Print Mode (available after conversion)
+
+## 💡 Tips & Best Practices
+
+### Efficient Commenting
+- Use consistent comment styles for different purposes
+- Keep comments concise but descriptive
+- Use the list view for final review passes
+- Leverage search to find specific comment types
+
+### Print Mode Tips
+- Preview before exporting to check callout formatting
+- Use meaningful callout types for different comment categories
+- Remember to restore content after PDF generation
+- Great for version control - export PDFs with feedback, keep original clean
+
+### Organization Strategies
+- Use header-based organization (outliner view) for structured documents
+- Use list view for chronological comment review
+- Convert high-priority comments to permanent callouts
+- Use search to filter by comment type or keyword
+
+### Collaboration Workflows
+1. **Review Phase**: Add comments using standard prefix
+2. **Discussion Phase**: Use Print Mode to share with team
+3. **Resolution Phase**: Convert resolved comments to callouts or delete
+4. **Final Phase**: Clean document with only essential permanent callouts
+
+## 🚧 Development
+
+### Building the Plugin
 ```bash
-npm run dev
+npm install          # Install dependencies
+npm run dev         # Development mode with watch
+npm run build       # Production build
 ```
 
 ### File Structure
+```
+obsidian-comments-manager/
+├── main.ts              # Main plugin code with dual view system
+├── styles.css           # Plugin styling for both view modes
+├── manifest.json        # Plugin metadata
+├── package.json         # Dependencies and scripts
+├── esbuild.config.mjs   # Build configuration
+└── README.md           # This file
+```
 
-- `main.ts` - Main plugin code
-- `styles.css` - Plugin styling
-- `manifest.json` - Plugin metadata
-- `esbuild.config.mjs` - Build configuration
+### Key Features in Code
+- **Dual View System**: Toggle between outliner and list rendering
+- **Lucide Icons**: Professional icon system throughout
+- **State Management**: Preserves user preferences and expansions
+- **Search Integration**: Real-time filtering for both view modes
+- **Print Mode**: Temporary document conversion system
 
-## Contributing
+## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+We welcome contributions! Here's how to help:
 
-## License
+1. **Fork the Repository**: Create your own copy
+2. **Create Feature Branch**: `git checkout -b feature/amazing-feature`
+3. **Make Changes**: Add your improvements
+4. **Test Thoroughly**: Ensure both view modes work properly
+5. **Commit Changes**: `git commit -m 'Add amazing feature'`
+6. **Push Branch**: `git push origin feature/amazing-feature`
+7. **Open Pull Request**: Submit for review
+
+### Contribution Ideas
+- New view modes or visualization options
+- Enhanced search capabilities
+- Additional export formats
+- Comment templates and snippets
+- Integration with other plugins
+- Performance optimizations
+
+## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 🙏 Support
 
-If you find this plugin helpful, consider:
-- ⭐ Starring the repository
-- 🐛 Reporting bugs or requesting features in the Issues section
-- 💡 Contributing improvements
+If you find this plugin helpful:
 
-## Images
+- ⭐ **Star the repository** to show your support
+- 🐛 **Report bugs** in the Issues section
+- 💡 **Request features** or suggest improvements
+- 🔄 **Share with others** who might benefit
+- ☕ **Buy me a coffee** if you'd like to support development
 
-**Example Note**
+## 📞 Getting Help
 
-Comments color in the image below is controlled by a css snippet
+- **Issues**: Report bugs or request features in GitHub Issues
+- **Discussions**: Join community discussions for tips and workflows
+- **Documentation**: Check this README for comprehensive guidance
+- **Debug Mode**: Enable in settings for troubleshooting information
 
-![ocm-image-1](https://github.com/user-attachments/assets/df507278-c1da-4e32-83c4-c014d072b0e1)
+## 🎉 Changelog
 
-**Comments Panel-Expanded by Default**
-
-![ocm-image-2](https://github.com/user-attachments/assets/2d9d1355-ca0c-48cc-b3a9-604e56f8de03)
-
-**Comments Panel-Collapsed**
-
-![ocm-image-3](https://github.com/user-attachments/assets/b7d1f21e-0e1d-44ca-9be0-bc7379c2f463)
-
-**Comments Panel-Manually Expanded**
-
-![ocm-image-4](https://github.com/user-attachments/assets/6647de02-2b54-4fae-aae7-872fda07965e)
-
-**Comments Panel-Edit Comment in Side Panel**
-
-![ocm-image-5](https://github.com/user-attachments/assets/63a38a4d-994e-4e40-85df-3f81ac52f89d)
-
-**Reading View**
-
-![ocm-image-6](https://github.com/user-attachments/assets/d6edad67-d087-48a1-b88e-8f78e6ff5334)
-
-**Export to pdf**
-
-![ocm-image-7](https://github.com/user-attachments/assets/55958ce0-e9ad-4c96-8d10-1f8e97f7cb7e)
-
-## Changelog
+### Version 1.3.0 (Latest)
+- **🆕 Dual View System**: Toggle between outliner and list views
+- **🎨 Lucide Icons**: Professional icon system throughout interface
+- **💾 View Preferences**: Saved view mode selection
+- **🔍 Enhanced Search**: Improved filtering for both view modes
+- **📱 Better Mobile**: Improved responsive design
+- **🐛 Bug Fixes**: Various stability improvements
 
 ### Version 1.2.0
-- **🖨️ Print Mode**: Convert all comments to callouts for PDF export without permanently modifying files
-- **📝 Individual Comment Conversion**: Convert specific comments to permanent callouts with custom titles
-- **🎨 Enhanced UI**: Added Print Mode button and conversion modal with professional styling
-- **⚙️ Print Mode Settings**: Configurable callout types and future options for author/timestamp inclusion
-- **🔧 Improved Reliability**: Better view detection and error handling for edge cases
-- **📖 Enhanced Documentation**: Comprehensive README with use cases and detailed feature explanations
+- **🖨️ Print Mode**: Convert comments to callouts for PDF export
+- **📝 Individual Conversion**: Convert specific comments to permanent callouts
+- **🎨 Enhanced UI**: Professional styling and modal interfaces
+- **⚙️ Print Settings**: Configurable callout types and options
+- **🔧 Improved Reliability**: Better view detection and error handling
 
 ### Version 1.1.0
-- Amended code to allow for multi-line comments where the comment start and ending markers (default "%%") are on different lines
+- **📝 Multi-line Comments**: Support for comments spanning multiple lines
+- **🔄 Enhanced Parsing**: Improved comment detection and handling
 
 ### Version 1.0.0
-- Initial release
-- Side panel with hierarchical comment organization
-- Search and filter functionality
-- In-panel and in-document editing
-- Customizable settings
-- State preservation for manual expansions
+- **🚀 Initial Release**: Core comment management functionality
+- **📋 Side Panel**: Hierarchical comment organization
+- **🔍 Search**: Real-time comment filtering
+- **✏️ Editing**: In-panel and in-document editing
+- **⚙️ Settings**: Customizable configuration options
+
+---
+
+**Made with ❤️ for the Obsidian community**

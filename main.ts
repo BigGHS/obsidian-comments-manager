@@ -1,4 +1,4 @@
-// main.ts - Beta version with Print Mode functionality
+// main.ts - Beta version with Print Mode functionality and dual view support
 import { 
 	App, 
 	Editor, 
@@ -11,8 +11,7 @@ import {
 	TFile,
 	EditorPosition,
 	Notice,
-	Modal,
-	setIcon
+	Modal
 } from 'obsidian';
 
 // Plugin settings interface
@@ -21,6 +20,7 @@ interface CommentsManagerSettings {
 	openOnStart: boolean;
 	debugMode: boolean;
 	defaultCollapsed: boolean;
+	defaultViewMode: 'outliner' | 'list';
 	// Print Mode settings
 	printModeCalloutType: string;
 	includeCommentAuthor: boolean;
@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS: CommentsManagerSettings = {
 	openOnStart: true,
 	debugMode: false,
 	defaultCollapsed: true,
+	defaultViewMode: 'outliner',
 	// Print Mode defaults
 	printModeCalloutType: 'comment',
 	includeCommentAuthor: false,
@@ -78,14 +79,14 @@ class PrintModePreviewModal extends Modal {
 	plugin: CommentsManagerPlugin;
 	originalContent: string;
 	convertedContent: string;
-	activeView: MarkdownView; // Store the active view reference
+	activeView: MarkdownView;
 	
 	constructor(app: App, plugin: CommentsManagerPlugin, originalContent: string, convertedContent: string, activeView: MarkdownView) {
 		super(app);
 		this.plugin = plugin;
 		this.originalContent = originalContent;
 		this.convertedContent = convertedContent;
-		this.activeView = activeView; // Store the view reference
+		this.activeView = activeView;
 	}
 
 	onOpen() {
@@ -136,78 +137,80 @@ class PrintModePreviewModal extends Modal {
 	}
 
 	async triggerPDFExport() {
-			if (!this.activeView) {
-				new Notice('No active markdown view available');
-				return;
-			}
+		if (!this.activeView) {
+			new Notice('No active markdown view available');
+			return;
+		}
 
-			const editor = this.activeView.editor;
-			if (!editor) {
-				new Notice('Editor is no longer available');
-				return;
-			}
+		const editor = this.activeView.editor;
+		if (!editor) {
+			new Notice('Editor is no longer available');
+			return;
+		}
+	
+		const originalContent = editor.getValue();
+	
+		try {
+			// Close modal first
+			this.close();
+			await new Promise(resolve => setTimeout(resolve, 200));
 		
-			const originalContent = editor.getValue();
+			// Focus the editor
+			this.activeView.editor.focus();
 		
-			try {
-				// Close modal first
-				this.close();
-				await new Promise(resolve => setTimeout(resolve, 200));
-			
-				// Focus the editor
-				this.activeView.editor.focus();
-			
-				// Set converted content
-				editor.setValue(this.convertedContent);
+			// Set converted content
+			editor.setValue(this.convertedContent);
+			editor.refresh();
+		
+			// Give time for rendering
+			await new Promise(resolve => setTimeout(resolve, 800));
+		
+			// Create a notice with restore function
+			const restoreContent = () => {
+				editor.setValue(originalContent);
 				editor.refresh();
-			
-				// Give time for rendering
-				await new Promise(resolve => setTimeout(resolve, 800));
-			
-				// Create a notice with restore function
-				const restoreContent = () => {
-					editor.setValue(originalContent);
-					editor.refresh();
-					new Notice('Original content restored');
-				};
-			
-				// Show persistent notice with restore option
-				const notice = new Notice('Document converted to callouts! Now use Ctrl+P or File → Export to PDF. Click here when done to restore original content.', 0);
-				notice.noticeEl.style.cursor = 'pointer';
-				notice.noticeEl.addEventListener('click', () => {
+				new Notice('Original content restored');
+			};
+		
+			// Show persistent notice with restore option
+			const notice = new Notice('Document converted to callouts! Now use Ctrl+P or File → Export to PDF. Click here when done to restore original content.', 0);
+			notice.noticeEl.style.cursor = 'pointer';
+			notice.noticeEl.addEventListener('click', () => {
+				restoreContent();
+				notice.hide();
+			});
+		
+			// Also add a command to restore content
+			const restoreCommand = this.plugin.addCommand({
+				id: 'restore-original-content',
+				name: 'Restore Original Content (after Print Mode)',
+				callback: () => {
 					restoreContent();
 					notice.hide();
-				});
-			
-				// Also add a command to restore content
-				const restoreCommand = this.plugin.addCommand({
-					id: 'restore-original-content',
-					name: 'Restore Original Content (after Print Mode)',
-					callback: () => {
-						restoreContent();
-						notice.hide();
-						// Remove this temporary command
-						(this.plugin as any).removeCommand('restore-original-content');
-					}
-				});
-			
-			} catch (error) {
-				console.error('Error during PDF export preparation:', error);
-				new Notice('Error preparing for PDF export: ' + error.message);
-				// Restore content on error
-				try {
-					editor.setValue(originalContent);
-					editor.refresh();
-				} catch (restoreError) {
-					console.error('Error restoring content:', restoreError);
+					// Remove this temporary command
+					(this.plugin as any).removeCommand('restore-original-content');
 				}
+			});
+		
+		} catch (error) {
+			console.error('Error during PDF export preparation:', error);
+			new Notice('Error preparing for PDF export: ' + error.message);
+			// Restore content on error
+			try {
+				editor.setValue(originalContent);
+				editor.refresh();
+			} catch (restoreError) {
+				console.error('Error restoring content:', restoreError);
 			}
 		}
+	}
+
 	onClose() {
 		const { contentEl } = this;
 		contentEl.empty();
 	}
 }
+
 // Comment Conversion Modal
 class CommentConversionModal extends Modal {
 	comment: CommentData;
@@ -320,9 +323,9 @@ export default class CommentsManagerPlugin extends Plugin {
 		);
 
 		// Add ribbon icon to toggle comments panel
-                this.addRibbonIcon('message-square', 'Toggle Comments Panel', () => {
-                        this.activateView();
-                });
+		this.addRibbonIcon('percent', 'Toggle Comments Panel', () => {
+			this.activateView();
+		});
 
 		// Add command to toggle comments panel
 		this.addCommand({
@@ -383,68 +386,69 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 
 	activatePrintMode() {
-			// Use the same robust view detection logic as the comments panel
-			let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-			let currentFile = this.app.workspace.getActiveFile();
-		
-			this.debug('Print Mode - Active view:', !!activeView, 'Current file:', !!currentFile);
-		
-			// If no active view but we have a current file, try to find the view for that file
-			if (!activeView && currentFile) {
+		// Use the same robust view detection logic as the comments panel
+		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		let currentFile = this.app.workspace.getActiveFile();
+	
+		this.debug('Print Mode - Active view:', !!activeView, 'Current file:', !!currentFile);
+	
+		// If no active view but we have a current file, try to find the view for that file
+		if (!activeView && currentFile) {
+			const leaves = this.app.workspace.getLeavesOfType('markdown');
+			for (const leaf of leaves) {
+				const view = leaf.view as MarkdownView;
+				if (view.file === currentFile) {
+					activeView = view;
+					this.debug('Found view for current file in Print Mode');
+					break;
+				}
+			}
+		}
+	
+		// Also check the comments view's stored current file
+		const commentsLeaves = this.app.workspace.getLeavesOfType(COMMENTS_VIEW_TYPE);
+		if (!activeView && commentsLeaves.length > 0) {
+			const commentsView = commentsLeaves[0].view as CommentsView;
+			if ((commentsView as any).currentFile) {
+				currentFile = (commentsView as any).currentFile;
+				this.debug('Using stored current file from comments view');
+			
+				// Try to find the view for this stored file
 				const leaves = this.app.workspace.getLeavesOfType('markdown');
 				for (const leaf of leaves) {
 					const view = leaf.view as MarkdownView;
 					if (view.file === currentFile) {
 						activeView = view;
-						this.debug('Found view for current file in Print Mode');
+						this.debug('Found view for stored file in Print Mode');
 						break;
 					}
 				}
 			}
-		
-			// Also check the comments view's stored current file
-			const commentsLeaves = this.app.workspace.getLeavesOfType(COMMENTS_VIEW_TYPE);
-			if (!activeView && commentsLeaves.length > 0) {
-				const commentsView = commentsLeaves[0].view as CommentsView;
-				if ((commentsView as any).currentFile) {
-					currentFile = (commentsView as any).currentFile;
-					this.debug('Using stored current file from comments view');
-				
-					// Try to find the view for this stored file
-					const leaves = this.app.workspace.getLeavesOfType('markdown');
-					for (const leaf of leaves) {
-						const view = leaf.view as MarkdownView;
-						if (view.file === currentFile) {
-							activeView = view;
-							this.debug('Found view for stored file in Print Mode');
-							break;
-						}
-					}
-				}
-			}
-
-			if (!activeView) {
-				new Notice('No active markdown file found. Please open a markdown file first.');
-				return;
-			}
-
-			const content = activeView.editor.getValue();
-		
-			if (!content || content.trim().length === 0) {
-				new Notice('The current file is empty');
-				return;
-			}
-		
-			const convertedContent = this.convertCommentsToCallouts(content);
-		
-			if (convertedContent === content) {
-				new Notice('No comments found to convert');
-				return;
-			}
-
-			// Show preview modal - pass the activeView reference
-			new PrintModePreviewModal(this.app, this, content, convertedContent, activeView).open();
 		}
+
+		if (!activeView) {
+			new Notice('No active markdown file found. Please open a markdown file first.');
+			return;
+		}
+
+		const content = activeView.editor.getValue();
+	
+		if (!content || content.trim().length === 0) {
+			new Notice('The current file is empty');
+			return;
+		}
+	
+		const convertedContent = this.convertCommentsToCallouts(content);
+	
+		if (convertedContent === content) {
+			new Notice('No comments found to convert');
+			return;
+		}
+
+		// Show preview modal - pass the activeView reference
+		new PrintModePreviewModal(this.app, this, content, convertedContent, activeView).open();
+	}
+
 	convertCommentsToCallouts(content: string): string {
 		const comments = this.extractComments(content);
 		const headers = this.extractHeaders(content);
@@ -811,18 +815,20 @@ export default class CommentsManagerPlugin extends Plugin {
 	}
 }
 
-// Comments View Class
+// Comments View Class with dual view support
 class CommentsView extends ItemView {
 	plugin: CommentsManagerPlugin;
 	private currentFile: TFile | null = null;
 	private renderedGroups: RenderedGroup[] = [];
 	private isCollapsed: boolean = false;
 	private hasManualExpansions: boolean = false;
+	private currentViewMode: 'outliner' | 'list' = 'outliner';
 
 	constructor(leaf: WorkspaceLeaf, plugin: CommentsManagerPlugin) {
 		super(leaf);
 		this.plugin = plugin;
 		this.isCollapsed = plugin.settings.defaultCollapsed;
+		this.currentViewMode = plugin.settings.defaultViewMode;
 	}
 
 	private debug(message: string, ...args: any[]) {
@@ -867,21 +873,44 @@ class CommentsView extends ItemView {
 		// Controls container
 		const controlsContainer = titleRow.createEl('div', { cls: 'comments-controls' });
 		
-		// Print Mode button
-                const printModeBtn = controlsContainer.createEl('button', {
-                         cls: 'comments-control-btn print-mode-btn',
-                         attr: { title: 'Convert comments to callouts for printing' }
-                 });
-                 setIcon(printModeBtn, 'printer');
+		// View mode toggle buttons
+		const viewModeContainer = controlsContainer.createEl('div', { cls: 'view-mode-toggle' });
 		
-		// Toggle button for collapse/expand all
+		const outlinerBtn = viewModeContainer.createEl('button', {
+			cls: `view-mode-btn ${this.currentViewMode === 'outliner' ? 'active' : ''}`,
+			attr: { title: 'Outliner view (grouped by headers)' }
+		});
+		// Using Lucide icon for outliner
+		outlinerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>';
+		
+		const listBtn = viewModeContainer.createEl('button', {
+			cls: `view-mode-btn ${this.currentViewMode === 'list' ? 'active' : ''}`,
+			attr: { title: 'List view (flat list of comments)' }
+		});
+		// Using Lucide icon for list
+		listBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
+		
+		// Print Mode button
+		const printModeBtn = controlsContainer.createEl('button', { 
+			cls: 'comments-control-btn print-mode-btn',
+			attr: { title: 'Convert comments to callouts for printing' }
+		});
+		// Using Lucide icon for printer
+		printModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
+		
+		// Toggle button for collapse/expand all (only visible in outliner mode)
 		const toggleAllBtn = controlsContainer.createEl('button', { 
 			cls: 'comments-toggle-btn',
 			attr: { title: 'Toggle collapse/expand all sections' }
 		});
 		
-                const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
-                setIcon(toggleIcon, this.isCollapsed ? 'plus' : 'minus');
+		const toggleIcon = toggleAllBtn.createEl('span', { cls: 'comments-toggle-icon' });
+		toggleIcon.innerHTML = this.isCollapsed ? '+' : '-';
+		
+		// Show/hide toggle button based on view mode
+		if (this.currentViewMode === 'list') {
+			toggleAllBtn.style.display = 'none';
+		}
 		
 		// Add search container below the title row
 		const searchContainer = header.createEl('div', { cls: 'comments-search-container' });
@@ -894,11 +923,24 @@ class CommentsView extends ItemView {
 			}
 		});
 		
-                const clearSearchBtn = searchContainer.createEl('button', {
-                        cls: 'comments-clear-search',
-                        attr: { title: 'Clear search' }
-                });
-                setIcon(clearSearchBtn, 'x');
+		const clearSearchBtn = searchContainer.createEl('button', {
+			cls: 'comments-clear-search',
+			attr: { title: 'Clear search' }
+		});
+		clearSearchBtn.innerHTML = '×';
+
+		// View mode button event handlers
+		outlinerBtn.onclick = (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.switchViewMode('outliner', outlinerBtn, listBtn, toggleAllBtn);
+		};
+
+		listBtn.onclick = (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			this.switchViewMode('list', outlinerBtn, listBtn, toggleAllBtn);
+		};
 
 		// Get active file content with a small delay to ensure proper focus
 		setTimeout(() => {
@@ -958,6 +1000,30 @@ class CommentsView extends ItemView {
 		}, 10);
 	}
 
+	private switchViewMode(newMode: 'outliner' | 'list', outlinerBtn: HTMLButtonElement, listBtn: HTMLButtonElement, toggleAllBtn: HTMLButtonElement) {
+		this.debug('Switching view mode to:', newMode);
+		
+		this.currentViewMode = newMode;
+		
+		// Update button states
+		if (newMode === 'outliner') {
+			outlinerBtn.addClass('active');
+			listBtn.removeClass('active');
+			toggleAllBtn.style.display = 'flex';
+		} else {
+			listBtn.addClass('active');
+			outlinerBtn.removeClass('active');
+			toggleAllBtn.style.display = 'none';
+		}
+		
+		// Save the preference
+		this.plugin.settings.defaultViewMode = newMode;
+		this.plugin.saveSettings();
+		
+		// Refresh the content
+		this.refresh();
+	}
+
 	private processComments(content: string, container: Element, toggleBtn?: HTMLButtonElement, toggleIcon?: HTMLElement, searchInput?: HTMLInputElement, clearSearchBtn?: HTMLButtonElement, printModeBtn?: HTMLButtonElement) {
 		this.debug('Processing comments for content of length:', content.length);
 		
@@ -973,9 +1039,8 @@ class CommentsView extends ItemView {
 		
 		const comments = this.plugin.extractComments(content);
 		const headers = this.plugin.extractHeaders(content);
-		const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
 		
-		this.debug('Found', comments.length, 'comments in', commentGroups.length, 'groups');
+		this.debug('Found', comments.length, 'comments in view mode:', this.currentViewMode);
 
 		if (comments.length === 0) {
 			container.createEl('div', { 
@@ -1005,18 +1070,21 @@ class CommentsView extends ItemView {
 
 		const commentsList = container.createEl('div', { cls: 'comments-list' });
 
-		const allGroups: CommentGroup[] = [];
-		const collectAllGroups = (groups: CommentGroup[]) => {
-			groups.forEach(group => {
-				allGroups.push(group);
-				if (group.children) {
-					collectAllGroups(group.children);
-				}
-			});
-		};
-		collectAllGroups(commentGroups);
+		// Handle toggle button for outliner mode
+		if (toggleBtn && toggleIcon && this.currentViewMode === 'outliner') {
+			const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
+			
+			const allGroups: CommentGroup[] = [];
+			const collectAllGroups = (groups: CommentGroup[]) => {
+				groups.forEach(group => {
+					allGroups.push(group);
+					if (group.children) {
+						collectAllGroups(group.children);
+					}
+				});
+			};
+			collectAllGroups(commentGroups);
 
-		if (toggleBtn && toggleIcon) {
 			toggleBtn.onclick = (e) => {
 				this.debug('Toggle button clicked, current state:', this.isCollapsed);
 				e.preventDefault();
@@ -1034,7 +1102,13 @@ class CommentsView extends ItemView {
 			const performSearch = () => {
 				const searchTerm = searchInput.value.toLowerCase().trim();
 				currentSearchTerm = searchTerm;
-				this.filterComments(commentsList, commentGroups, searchTerm);
+				
+				if (this.currentViewMode === 'outliner') {
+					const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
+					this.filterComments(commentsList, commentGroups, searchTerm);
+				} else {
+					this.filterListComments(commentsList, comments, searchTerm);
+				}
 				
 				if (searchTerm) {
 					clearSearchBtn.style.display = 'block';
@@ -1065,6 +1139,17 @@ class CommentsView extends ItemView {
 			clearSearchBtn.style.display = 'none';
 		}
 
+		// Render based on current view mode
+		if (this.currentViewMode === 'outliner') {
+			this.renderOutlinerView(comments, headers, commentsList, currentStates);
+		} else {
+			this.renderListView(comments, commentsList);
+		}
+	}
+
+	private renderOutlinerView(comments: CommentData[], headers: HeaderData[], commentsList: Element, currentStates: Map<string, boolean>) {
+		const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
+		
 		commentGroups.forEach(group => {
 			if (this.isCollapsed && !this.hasManualExpansions) {
 				this.setGroupCollapsedRecursively(group, true);
@@ -1080,905 +1165,1060 @@ class CommentsView extends ItemView {
 		this.debug('Initial collapsed state:', this.isCollapsed, 'hasManualExpansions:', this.hasManualExpansions);
 	}
 
-	private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
-		const restoreGroup = (group: CommentGroup) => {
-			if (group.header) {
-				const key = `${group.header.level}-${group.header.text}`;
-				const wasExpanded = states.get(key);
-				if (wasExpanded !== undefined) {
-					group.isCollapsed = !wasExpanded;
-					
-					const rendered = this.renderedGroups.find(r => 
-						r.group.header && 
-						r.group.header.level === group.header!.level && 
-						r.group.header.text === group.header!.text
-					);
-                                        if (rendered) {
-                                                setIcon(rendered.collapseIcon as HTMLElement, group.isCollapsed ? 'chevron-right' : 'chevron-down');
-                                                rendered.contentElement.style.display = group.isCollapsed ? 'none' : 'block';
-                                        }
-				}
-			}
-			
-			if (group.children) {
-				group.children.forEach(restoreGroup);
-			}
-		};
+	private renderListView(comments: CommentData[], commentsList: Element) {
+		this.debug('Rendering list view with', comments.length, 'comments');
 		
-		groups.forEach(restoreGroup);
-	}
-
-	private setGroupCollapsedRecursively(group: CommentGroup, collapsed: boolean) {
-		group.isCollapsed = collapsed;
-		if (group.children) {
-			group.children.forEach(child => {
-				this.setGroupCollapsedRecursively(child, collapsed);
-			});
-		}
-	}
-
-	private highlightSearchText(text: string, searchTerm: string): string {
-		if (!searchTerm) return text;
-	
-		const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-		return text.replace(regex, '<mark class="search-highlight">$1</mark>');
-	}
-
-	private filterComments(commentsList: Element, commentGroups: CommentGroup[], searchTerm: string) {
-		commentsList.empty();
+		// Sort comments by their position in the document
+		const sortedComments = [...comments].sort((a, b) => a.line - b.line);
 		
-		if (!searchTerm) {
-			commentGroups.forEach(group => {
-				this.renderCommentGroup(group, commentsList, 0);
-			});
-			return;
-		}
+		const listContainer = commentsList.createEl('div', { cls: 'comments-list-flat' });
 		
-		const filteredGroups = this.filterGroupsRecursively(commentGroups, searchTerm);
-		
-		if (filteredGroups.length === 0) {
-			commentsList.createEl('div', {
-				text: 'No matching comments found',
-				cls: 'comments-empty'
-			});
-			return;
-		}
-		
-		filteredGroups.forEach(group => {
-			this.renderCommentGroup(group, commentsList, 0);
+		sortedComments.forEach((comment, index) => {
+			this.createListCommentElement(comment, listContainer, index + 1);
 		});
 	}
 	
-	private filterGroupsRecursively(groups: CommentGroup[], searchTerm: string): CommentGroup[] {
-		const filtered: CommentGroup[] = [];
+	private createListCommentElement(comment: CommentData, container: Element, commentNumber: number) {
+			const commentEl = container.createEl('div', { cls: 'comment-item comment-list-item' });
 		
-		groups.forEach(group => {
-			const headerMatches = group.header?.text.toLowerCase().includes(searchTerm) || false;
-			
-			const matchingComments = group.comments.filter(comment => 
+			// Comment number and line indicator
+			const headerEl = commentEl.createEl('div', { cls: 'comment-list-header' });
+			const numberEl = headerEl.createEl('span', { 
+				text: `${commentNumber}`, 
+				cls: 'comment-list-number' 
+			});
+			const lineEl = headerEl.createEl('span', { 
+				text: `Line ${comment.line + 1}`, 
+				cls: 'comment-list-line' 
+			});
+		
+			const contentEl = commentEl.createEl('div', { cls: 'comment-content' });
+		
+			const isMultiLine = comment.text.includes('\n');
+		
+			let textEl: HTMLElement;
+			if (isMultiLine) {
+				textEl = contentEl.createEl('textarea', { 
+					cls: 'comment-text comment-textarea',
+					attr: { 
+						spellcheck: 'false',
+						rows: (comment.text.split('\n').length + 1).toString()
+					}
+				}) as HTMLTextAreaElement;
+				(textEl as HTMLTextAreaElement).value = comment.text || '';
+			} else {
+				textEl = contentEl.createEl('div', { 
+					cls: 'comment-text',
+					attr: { contenteditable: 'true', spellcheck: 'false' }
+				});
+				textEl.textContent = comment.text || '(empty comment)';
+			}
+		
+			const currentSearchTerm = (this as any).currentSearchTerm || '';
+			if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
+				if (textEl.tagName === 'DIV') {
+					textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
+				}
+			}
+
+			// Action buttons container
+			const actionsEl = commentEl.createEl('div', { cls: 'comment-actions' });
+		
+			// Save button (initially hidden)
+			const saveBtn = actionsEl.createEl('button', { 
+				text: 'Save', 
+				cls: 'comment-btn comment-save-btn' 
+			});
+			saveBtn.style.display = 'none';
+		
+			// Cancel button (initially hidden)
+			const cancelBtn = actionsEl.createEl('button', { 
+				text: 'Cancel', 
+				cls: 'comment-btn comment-cancel-btn' 
+			});
+			cancelBtn.style.display = 'none';
+
+			// Convert to Callout button
+			const convertBtn = actionsEl.createEl('button', { 
+				cls: 'comment-btn comment-convert-btn',
+				attr: { title: 'Convert to callout' }
+			});
+			// Using Lucide icon for edit/convert
+			convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+			// Delete button
+			const deleteBtn = actionsEl.createEl('button', { 
+				text: '×', 
+				cls: 'comment-btn comment-delete-btn',
+				attr: { title: 'Delete comment' }
+			});
+
+			// Set up the same event handlers as the outliner view
+			this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
+		}
+
+		private filterListComments(commentsList: Element, comments: CommentData[], searchTerm: string) {
+			commentsList.empty();
+		
+			if (!searchTerm) {
+				this.renderListView(comments, commentsList.parentElement!);
+				return;
+			}
+		
+			const filteredComments = comments.filter(comment => 
 				comment.text.toLowerCase().includes(searchTerm)
 			);
+		
+			if (filteredComments.length === 0) {
+				commentsList.createEl('div', {
+					text: 'No matching comments found',
+					cls: 'comments-empty'
+				});
+				return;
+			}
+		
+			const listContainer = commentsList.createEl('div', { cls: 'comments-list-flat' });
+			const sortedComments = [...filteredComments].sort((a, b) => a.line - b.line);
+		
+			sortedComments.forEach((comment, index) => {
+				this.createListCommentElement(comment, listContainer, index + 1);
+			});
+		}
+
+		private setupCommentElementEvents(
+			commentEl: HTMLElement, 
+			textEl: HTMLElement, 
+			comment: CommentData, 
+			saveBtn: HTMLButtonElement, 
+			cancelBtn: HTMLButtonElement, 
+			convertBtn: HTMLButtonElement, 
+			deleteBtn: HTMLButtonElement,
+			currentSearchTerm: string
+		) {
+			convertBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
 			
-			const filteredChildren = group.children ? 
-				this.filterGroupsRecursively(group.children, searchTerm) : [];
+				// Open the conversion modal
+				new CommentConversionModal(this.app, comment, (customTitle: string) => {
+					this.convertCommentToCallout(comment, customTitle);
+				}).open();
+			});
+
+			let originalText = comment.text;
+			let isEditing = false;
+
+			const handleInput = () => {
+				if (!isEditing) {
+					isEditing = true;
+					saveBtn.style.display = 'inline-block';
+					cancelBtn.style.display = 'inline-block';
+					deleteBtn.style.display = 'none';
+					commentEl.addClass('comment-editing');
+				}
+			};
+
+			if (textEl.tagName === 'TEXTAREA') {
+				(textEl as HTMLTextAreaElement).addEventListener('input', handleInput);
 			
-			if (headerMatches || matchingComments.length > 0 || filteredChildren.length > 0) {
-				const filteredGroup: CommentGroup = {
-					header: group.header,
-					comments: headerMatches ? group.comments : matchingComments,
-					children: filteredChildren.length > 0 ? filteredChildren : undefined,
-					parent: group.parent,
-					isCollapsed: false
+				const autoResize = () => {
+					const textarea = textEl as HTMLTextAreaElement;
+					textarea.style.height = 'auto';
+					textarea.style.height = textarea.scrollHeight + 'px';
 				};
-				
-				filtered.push(filteredGroup);
-			}
-		});
-		
-		return filtered;
-	}
-
-	private renderCommentGroup(group: CommentGroup, container: Element, depth: number) {
-		const headerSection = container.createEl('div', { cls: 'comment-header-section' });
-		headerSection.style.marginLeft = `${depth * 12}px`;
-		
-		const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
-		
-                const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
-                const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
-
-                if (hasChildren) {
-                        setIcon(collapseIcon, group.isCollapsed ? 'chevron-right' : 'chevron-down');
-                        collapseIcon.style.visibility = 'visible';
-                } else {
-                        collapseIcon.style.visibility = 'hidden';
-                }
-		
-		const headerText = headerEl.createEl('span', { cls: 'comment-header-text' });
-		if (group.header) {
-			const totalComments = this.countTotalComments(group);
-			if (totalComments > 0) {
-				headerText.textContent = `${group.header.text} (${totalComments})`;
-			} else {
-				headerText.textContent = group.header.text;
-			}
-		} else {
-			headerText.textContent = `No Header (${group.comments.length})`;
-		}
-		
-		const groupContent = headerSection.createEl('div', { cls: 'comment-group-content' });
-		if (group.isCollapsed) {
-			groupContent.style.display = 'none';
-		}
-		
-		if (hasChildren) {
-			this.renderedGroups.push({
-				group: group,
-				collapseIcon: collapseIcon,
-				contentElement: groupContent
-			});
-		}
-		
-		if (hasChildren) {
-			collapseIcon.addEventListener('click', (e) => {
-				this.debug('Collapse icon clicked for group:', group.header?.text || 'No Header');
-				e.preventDefault();
-				e.stopPropagation();
-				this.toggleGroupCollapse(group, collapseIcon, groupContent);
-			});
-		}
-		
-		if (group.header) {
-			headerText.addEventListener('click', (e) => {
-				this.debug('Header text clicked, navigating to:', group.header!.text);
-				e.preventDefault();
-				e.stopPropagation();
-				
-				this.plugin.skipNextRefresh = true;
-				this.plugin.highlightHeaderInEditor(group.header!);
-				
-				setTimeout(() => {
-					this.plugin.skipNextRefresh = false;
-				}, 100);
-				
-				return false;
-			});
 			
-			headerEl.addEventListener('click', (e) => {
-				if (e.target === collapseIcon || e.target === headerText) {
+				(textEl as HTMLTextAreaElement).addEventListener('input', autoResize);
+				setTimeout(autoResize, 0);
+			} else {
+				textEl.addEventListener('input', handleInput);
+			}
+
+			const handleKeydown = (e: KeyboardEvent) => {
+				if (e.key === 'Enter' && !e.shiftKey && textEl.tagName !== 'TEXTAREA') {
+					e.preventDefault();
+					saveComment();
+				} else if (e.key === 'Enter' && e.ctrlKey && textEl.tagName === 'TEXTAREA') {
+					e.preventDefault();
+					saveComment();
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					cancelEdit();
+				}
+			};
+
+			textEl.addEventListener('keydown', handleKeydown);
+
+			const saveComment = () => {
+				let newText: string;
+				if (textEl.tagName === 'TEXTAREA') {
+					newText = (textEl as HTMLTextAreaElement).value.trim();
+				} else {
+					newText = textEl.textContent?.trim() || '';
+				}
+			
+				if (newText !== originalText) {
+					this.updateCommentInEditor(comment, newText);
+					originalText = newText;
+				}
+				exitEditMode();
+			};
+
+			const cancelEdit = () => {
+				if (textEl.tagName === 'TEXTAREA') {
+					(textEl as HTMLTextAreaElement).value = originalText;
+				} else {
+					if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
+						textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+					} else {
+						textEl.textContent = originalText;
+					}
+				}
+				exitEditMode();
+			};
+
+			const exitEditMode = () => {
+				isEditing = false;
+				saveBtn.style.display = 'none';
+				cancelBtn.style.display = 'none';
+				deleteBtn.style.display = 'inline-block';
+				commentEl.removeClass('comment-editing');
+				textEl.blur();
+			};
+
+			saveBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				saveComment();
+			});
+
+			cancelBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+				cancelEdit();
+			});
+
+			deleteBtn.addEventListener('click', (e) => {
+				e.stopPropagation();
+			
+				const confirmDelete = confirm(`Are you sure you want to delete this comment?\n\n"${comment.text.length > 100 ? comment.text.substring(0, 100) + '...' : comment.text}"`);
+				if (confirmDelete) {
+					this.deleteCommentFromEditor(comment);
+				}
+			});
+
+			commentEl.addEventListener('click', (e) => {
+				this.debug('Comment clicked, isEditing:', isEditing, 'target:', e.target);
+			
+				if (isEditing) return;
+			
+				const target = e.target as HTMLElement;
+				if (target.tagName === 'BUTTON' || target.closest('button')) {
+					this.debug('Click was on button, ignoring');
 					return;
 				}
+			
+				if (target === textEl) {
+					this.debug('Clicked on text element, entering edit mode');
+					e.preventDefault();
+					e.stopPropagation();
+				
+					isEditing = true;
+					saveBtn.style.display = 'inline-block';
+					cancelBtn.style.display = 'inline-block';
+					deleteBtn.style.display = 'none';
+					commentEl.addClass('comment-editing');
+				
+					textEl.focus();
+				
+					if (textEl.tagName === 'TEXTAREA') {
+						(textEl as HTMLTextAreaElement).select();
+					} else {
+						const range = document.createRange();
+						range.selectNodeContents(textEl);
+						const selection = window.getSelection();
+						if (selection) {
+							selection.removeAllRanges();
+							selection.addRange(range);
+						}
+					}
+				
+					return;
+				}
+			
+				this.debug('Calling highlightCommentInEditor');
 				e.preventDefault();
 				e.stopPropagation();
-				return false;
-			});
-		}
-
-		if (group.comments.length > 0) {
-			const groupComments = groupContent.createEl('div', { cls: 'comment-group-comments' });
-			group.comments.forEach(comment => {
-				this.createCommentElement(comment, groupComments);
-			});
-		}
-
-		if (group.children) {
-			group.children.forEach(childGroup => {
-				this.renderCommentGroup(childGroup, groupContent, depth + 1);
-			});
-		}
-	}
-
-	private countTotalComments(group: CommentGroup): number {
-		let total = group.comments.length;
-		if (group.children) {
-			group.children.forEach((child: CommentGroup) => {
-				total += this.countTotalComments(child);
-			});
-		}
-		return total;
-	}
-
-	private toggleGroupCollapse(group: CommentGroup, icon: Element, content: HTMLElement) {
-		group.isCollapsed = !group.isCollapsed;
-		
-                if (group.isCollapsed) {
-                        setIcon(icon as HTMLElement, 'chevron-right');
-                        content.style.display = 'none';
-                } else {
-                        setIcon(icon as HTMLElement, 'chevron-down');
-                        content.style.display = 'block';
-                        this.hasManualExpansions = true;
-                }
-
-		if (group.isCollapsed && group.children) {
-			this.collapseAllChildren(group);
-		}
-		
-		this.debug('Group toggled, hasManualExpansions:', this.hasManualExpansions);
-	}
-
-	private toggleAllGroups(toggleIcon: HTMLElement) {
-		this.debug('toggleAllGroups called, current state:', this.isCollapsed);
-		
-		if (this.isCollapsed) {
-			this.debug('Expanding all groups');
-			this.expandAllGroups([]);
-			this.hasManualExpansions = false;
-		} else {
-			this.debug('Collapsing all groups to top level overview');
-			this.collapseAllGroups([]);
-			this.hasManualExpansions = false;
-		}
-		
-		this.isCollapsed = !this.isCollapsed;
-		this.updateToggleButton(toggleIcon);
-		
-		this.debug('toggleAllGroups completed, new state:', this.isCollapsed);
-	}
-	
-        private updateToggleButton(toggleIcon: HTMLElement) {
-                if (this.isCollapsed) {
-                        setIcon(toggleIcon, 'plus');
-                        toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
-                } else {
-                        setIcon(toggleIcon, 'minus');
-                        toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
-                }
-        }
-
-	private collapseAllGroups(allGroups: CommentGroup[]) {
-		this.debug('Collapsing all groups to top level overview');
-		
-		this.renderedGroups.forEach(rendered => {
-			const hasContent = (rendered.group.children && rendered.group.children.length > 0) || rendered.group.comments.length > 0;
 			
-			if (hasContent) {
-                                rendered.group.isCollapsed = true;
-                                setIcon(rendered.collapseIcon as HTMLElement, 'chevron-right');
-                                rendered.contentElement.style.display = 'none';
-			}
-		});
-	}
+				this.plugin.skipNextRefresh = true;
+				this.plugin.highlightCommentInEditor(comment);
+			
+				setTimeout(() => {
+					this.plugin.skipNextRefresh = false;
+				}, 300);
+			});
 
-	private expandAllGroups(allGroups: CommentGroup[]) {
-	    this.debug('Expanding all groups');
-	    this.renderedGroups.forEach(rendered => {
-	        rendered.group.isCollapsed = false;
-	        setIcon(rendered.collapseIcon as HTMLElement, 'chevron-down');
-	        rendered.contentElement.style.display = 'block';
-	    });
-	}
+			commentEl.addEventListener('mouseleave', () => {
+				commentEl.removeClass('comment-item-hover');
+			});
+		}
 
-	private collapseAllChildren(group: CommentGroup) {
-	    if (group.children) {
-	        group.children.forEach((child: CommentGroup) => {
-	            child.isCollapsed = true;
-	            this.collapseAllChildren(child);
-	        });
-	    }
-	}
-
-	private createCommentElement(comment: CommentData, container: Element) {
-		const commentEl = container.createEl('div', { cls: 'comment-item' });
-		
-		const contentEl = commentEl.createEl('div', { cls: 'comment-content' });
-		
-		const isMultiLine = comment.text.includes('\n');
-		
-		let textEl: HTMLElement;
-		if (isMultiLine) {
-			textEl = contentEl.createEl('textarea', { 
-				cls: 'comment-text comment-textarea',
-				attr: { 
-					spellcheck: 'false',
-					rows: (comment.text.split('\n').length + 1).toString()
+		private restoreExpansionStates(groups: CommentGroup[], states: Map<string, boolean>) {
+			const restoreGroup = (group: CommentGroup) => {
+				if (group.header) {
+					const key = `${group.header.level}-${group.header.text}`;
+					const wasExpanded = states.get(key);
+					if (wasExpanded !== undefined) {
+						group.isCollapsed = !wasExpanded;
+					
+						const rendered = this.renderedGroups.find(r => 
+							r.group.header && 
+							r.group.header.level === group.header!.level && 
+							r.group.header.text === group.header!.text
+						);
+						if (rendered) {
+							rendered.collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
+							rendered.contentElement.style.display = group.isCollapsed ? 'none' : 'block';
+						}
+					}
 				}
-			}) as HTMLTextAreaElement;
-			(textEl as HTMLTextAreaElement).value = comment.text || '';
-		} else {
-			textEl = contentEl.createEl('div', { 
-				cls: 'comment-text',
-				attr: { contenteditable: 'true', spellcheck: 'false' }
-			});
-			textEl.textContent = comment.text || '(empty comment)';
-		}
-		
-		const currentSearchTerm = (this as any).currentSearchTerm || '';
-		if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
-			if (textEl.tagName === 'DIV') {
-				textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
-			}
-		}
-		
-		const lineEl = contentEl.createEl('div', { 
-			text: `Line ${comment.line + 1}`, 
-			cls: 'comment-line' 
-		});
-
-		// Action buttons container
-		const actionsEl = commentEl.createEl('div', { cls: 'comment-actions' });
-		
-		// Save button (initially hidden)
-		const saveBtn = actionsEl.createEl('button', { 
-			text: 'Save', 
-			cls: 'comment-btn comment-save-btn' 
-		});
-		saveBtn.style.display = 'none';
-		
-		// Cancel button (initially hidden)
-		const cancelBtn = actionsEl.createEl('button', { 
-			text: 'Cancel', 
-			cls: 'comment-btn comment-cancel-btn' 
-		});
-		cancelBtn.style.display = 'none';
-
-		// Convert to Callout button
-                const convertBtn = actionsEl.createEl('button', {
-                        cls: 'comment-btn comment-convert-btn',
-                        attr: { title: 'Convert to callout' }
-                });
-                setIcon(convertBtn, 'pencil');
-
-		// Delete button
-                const deleteBtn = actionsEl.createEl('button', {
-                        cls: 'comment-btn comment-delete-btn',
-                        attr: { title: 'Delete comment' }
-                });
-                setIcon(deleteBtn, 'trash');
-		convertBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
 			
-			// Open the conversion modal
-			new CommentConversionModal(this.app, comment, (customTitle: string) => {
-			  this.convertCommentToCallout(comment, customTitle);
-			}).open();
-		});
-
-		let originalText = comment.text;
-		let isEditing = false;
-
-		const handleInput = () => {
-			if (!isEditing) {
-				isEditing = true;
-				saveBtn.style.display = 'inline-block';
-				cancelBtn.style.display = 'inline-block';
-				deleteBtn.style.display = 'none';
-				commentEl.addClass('comment-editing');
-			}
-		};
-
-		if (textEl.tagName === 'TEXTAREA') {
-			(textEl as HTMLTextAreaElement).addEventListener('input', handleInput);
-			
-			const autoResize = () => {
-				const textarea = textEl as HTMLTextAreaElement;
-				textarea.style.height = 'auto';
-				textarea.style.height = textarea.scrollHeight + 'px';
+				if (group.children) {
+					group.children.forEach(restoreGroup);
+				}
 			};
-			
-			(textEl as HTMLTextAreaElement).addEventListener('input', autoResize);
-			setTimeout(autoResize, 0);
-		} else {
-			textEl.addEventListener('input', handleInput);
+		
+			groups.forEach(restoreGroup);
 		}
 
-		const handleKeydown = (e: KeyboardEvent) => {
-			if (e.key === 'Enter' && !e.shiftKey && textEl.tagName !== 'TEXTAREA') {
-				e.preventDefault();
-				saveComment();
-			} else if (e.key === 'Enter' && e.ctrlKey && textEl.tagName === 'TEXTAREA') {
-				e.preventDefault();
-				saveComment();
-			} else if (e.key === 'Escape') {
-				e.preventDefault();
-				cancelEdit();
+		private setGroupCollapsedRecursively(group: CommentGroup, collapsed: boolean) {
+			group.isCollapsed = collapsed;
+			if (group.children) {
+				group.children.forEach(child => {
+					this.setGroupCollapsedRecursively(child, collapsed);
+				});
 			}
-		};
+		}
 
-		textEl.addEventListener('keydown', handleKeydown);
+		private highlightSearchText(text: string, searchTerm: string): string {
+			if (!searchTerm) return text;
+	
+			const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+			return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+		}
 
-		const saveComment = () => {
-			let newText: string;
-			if (textEl.tagName === 'TEXTAREA') {
-				newText = (textEl as HTMLTextAreaElement).value.trim();
-			} else {
-				newText = textEl.textContent?.trim() || '';
+		private filterComments(commentsList: Element, commentGroups: CommentGroup[], searchTerm: string) {
+			commentsList.empty();
+		
+			if (!searchTerm) {
+				commentGroups.forEach(group => {
+					this.renderCommentGroup(group, commentsList, 0);
+				});
+				return;
 			}
+		
+			const filteredGroups = this.filterGroupsRecursively(commentGroups, searchTerm);
+		
+			if (filteredGroups.length === 0) {
+				commentsList.createEl('div', {
+					text: 'No matching comments found',
+					cls: 'comments-empty'
+				});
+				return;
+			}
+		
+			filteredGroups.forEach(group => {
+				this.renderCommentGroup(group, commentsList, 0);
+			});
+		}
+	
+		private filterGroupsRecursively(groups: CommentGroup[], searchTerm: string): CommentGroup[] {
+			const filtered: CommentGroup[] = [];
+		
+			groups.forEach(group => {
+				const headerMatches = group.header?.text.toLowerCase().includes(searchTerm) || false;
 			
-			if (newText !== originalText) {
-				this.updateCommentInEditor(comment, newText);
-				originalText = newText;
-			}
-			exitEditMode();
-		};
-
-		const cancelEdit = () => {
-			if (textEl.tagName === 'TEXTAREA') {
-				(textEl as HTMLTextAreaElement).value = originalText;
-			} else {
-				if (currentSearchTerm && originalText.toLowerCase().includes(currentSearchTerm)) {
-					textEl.innerHTML = this.highlightSearchText(originalText, currentSearchTerm);
+				const matchingComments = group.comments.filter(comment => 
+					comment.text.toLowerCase().includes(searchTerm)
+				);
+			
+				const filteredChildren = group.children ? 
+					this.filterGroupsRecursively(group.children, searchTerm) : [];
+			
+				if (headerMatches || matchingComments.length > 0 || filteredChildren.length > 0) {
+					const filteredGroup: CommentGroup = {
+						header: group.header,
+						comments: headerMatches ? group.comments : matchingComments,
+						children: filteredChildren.length > 0 ? filteredChildren : undefined,
+						parent: group.parent,
+						isCollapsed: false
+					};
+				
+					filtered.push(filteredGroup);
+				}
+			});
+		
+			return filtered;
+		}
+		
+		private renderCommentGroup(group: CommentGroup, container: Element, depth: number) {
+				const headerSection = container.createEl('div', { cls: 'comment-header-section' });
+				headerSection.style.marginLeft = `${depth * 12}px`;
+		
+				const headerEl = headerSection.createEl('div', { cls: 'comment-header' });
+		
+				const collapseIcon = headerEl.createEl('span', { cls: 'comment-collapse-icon' });
+				const hasChildren = (group.children && group.children.length > 0) || group.comments.length > 0;
+		
+				if (hasChildren) {
+					collapseIcon.textContent = group.isCollapsed ? '▶' : '▼';
+					collapseIcon.style.visibility = 'visible';
 				} else {
-					textEl.textContent = originalText;
+					collapseIcon.style.visibility = 'hidden';
 				}
-			}
-			exitEditMode();
-		};
-
-		const exitEditMode = () => {
-			isEditing = false;
-			saveBtn.style.display = 'none';
-			cancelBtn.style.display = 'none';
-			deleteBtn.style.display = 'inline-block';
-			commentEl.removeClass('comment-editing');
-			textEl.blur();
-		};
-
-		saveBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			saveComment();
-		});
-
-		cancelBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			cancelEdit();
-		});
-
-		deleteBtn.addEventListener('click', (e) => {
-			e.stopPropagation();
-			
-			const confirmDelete = confirm(`Are you sure you want to delete this comment?\n\n"${comment.text.length > 100 ? comment.text.substring(0, 100) + '...' : comment.text}"`);
-			if (confirmDelete) {
-				this.deleteCommentFromEditor(comment);
-			}
-		});
-
-		commentEl.addEventListener('click', (e) => {
-			this.debug('Comment clicked, isEditing:', isEditing, 'target:', e.target);
-			
-			if (isEditing) return;
-			
-			const target = e.target as HTMLElement;
-			if (target.tagName === 'BUTTON' || target.closest('button')) {
-				this.debug('Click was on button, ignoring');
-				return;
-			}
-			
-			if (target === textEl) {
-				this.debug('Clicked on text element, entering edit mode');
-				e.preventDefault();
-				e.stopPropagation();
-				
-				isEditing = true;
-				saveBtn.style.display = 'inline-block';
-				cancelBtn.style.display = 'inline-block';
-				deleteBtn.style.display = 'none';
-				commentEl.addClass('comment-editing');
-				
-				textEl.focus();
-				
-				if (textEl.tagName === 'TEXTAREA') {
-					(textEl as HTMLTextAreaElement).select();
+		
+				const headerText = headerEl.createEl('span', { cls: 'comment-header-text' });
+				if (group.header) {
+					const totalComments = this.countTotalComments(group);
+					if (totalComments > 0) {
+						headerText.textContent = `${group.header.text} (${totalComments})`;
+					} else {
+						headerText.textContent = group.header.text;
+					}
 				} else {
-					const range = document.createRange();
-					range.selectNodeContents(textEl);
-					const selection = window.getSelection();
-					if (selection) {
-						selection.removeAllRanges();
-						selection.addRange(range);
-					}
+					headerText.textContent = `No Header (${group.comments.length})`;
 				}
+		
+				const groupContent = headerSection.createEl('div', { cls: 'comment-group-content' });
+				if (group.isCollapsed) {
+					groupContent.style.display = 'none';
+				}
+		
+				if (hasChildren) {
+					this.renderedGroups.push({
+						group: group,
+						collapseIcon: collapseIcon,
+						contentElement: groupContent
+					});
+				}
+		
+				if (hasChildren) {
+					collapseIcon.addEventListener('click', (e) => {
+						this.debug('Collapse icon clicked for group:', group.header?.text || 'No Header');
+						e.preventDefault();
+						e.stopPropagation();
+						this.toggleGroupCollapse(group, collapseIcon, groupContent);
+					});
+				}
+		
+				if (group.header) {
+					headerText.addEventListener('click', (e) => {
+						this.debug('Header text clicked, navigating to:', group.header!.text);
+						e.preventDefault();
+						e.stopPropagation();
 				
-				return;
-			}
+						this.plugin.skipNextRefresh = true;
+						this.plugin.highlightHeaderInEditor(group.header!);
+				
+						setTimeout(() => {
+							this.plugin.skipNextRefresh = false;
+						}, 100);
+				
+						return false;
+					});
 			
-			this.debug('Calling highlightCommentInEditor');
-			e.preventDefault();
-			e.stopPropagation();
+					headerEl.addEventListener('click', (e) => {
+						if (e.target === collapseIcon || e.target === headerText) {
+							return;
+						}
+						e.preventDefault();
+						e.stopPropagation();
+						return false;
+					});
+				}
+
+				if (group.comments.length > 0) {
+					const groupComments = groupContent.createEl('div', { cls: 'comment-group-comments' });
+					group.comments.forEach(comment => {
+						this.createCommentElement(comment, groupComments);
+					});
+				}
+
+				if (group.children) {
+					group.children.forEach(childGroup => {
+						this.renderCommentGroup(childGroup, groupContent, depth + 1);
+					});
+				}
+			}
+
+			private countTotalComments(group: CommentGroup): number {
+				let total = group.comments.length;
+				if (group.children) {
+					group.children.forEach((child: CommentGroup) => {
+						total += this.countTotalComments(child);
+					});
+				}
+				return total;
+			}
+
+			private toggleGroupCollapse(group: CommentGroup, icon: Element, content: HTMLElement) {
+				group.isCollapsed = !group.isCollapsed;
+		
+				if (group.isCollapsed) {
+					icon.textContent = '▶';
+					content.style.display = 'none';
+				} else {
+					icon.textContent = '▼';
+					content.style.display = 'block';
+					this.hasManualExpansions = true;
+				}
+
+				if (group.isCollapsed && group.children) {
+					this.collapseAllChildren(group);
+				}
+		
+				this.debug('Group toggled, hasManualExpansions:', this.hasManualExpansions);
+			}
+
+			private toggleAllGroups(toggleIcon: HTMLElement) {
+				this.debug('toggleAllGroups called, current state:', this.isCollapsed);
+		
+				if (this.isCollapsed) {
+					this.debug('Expanding all groups');
+					this.expandAllGroups([]);
+					this.hasManualExpansions = false;
+				} else {
+					this.debug('Collapsing all groups to top level overview');
+					this.collapseAllGroups([]);
+					this.hasManualExpansions = false;
+				}
+		
+				this.isCollapsed = !this.isCollapsed;
+				this.updateToggleButton(toggleIcon);
+		
+				this.debug('toggleAllGroups completed, new state:', this.isCollapsed);
+			}
+	
+			private updateToggleButton(toggleIcon: HTMLElement) {
+				if (this.isCollapsed) {
+					toggleIcon.innerHTML = '+';
+					toggleIcon.parentElement!.setAttribute('title', 'Expand all sections');
+				} else {
+					toggleIcon.innerHTML = '-';
+					toggleIcon.parentElement!.setAttribute('title', 'Collapse all sections');
+				}
+			}
+
+			private collapseAllGroups(allGroups: CommentGroup[]) {
+				this.debug('Collapsing all groups to top level overview');
+		
+				this.renderedGroups.forEach(rendered => {
+					const hasContent = (rendered.group.children && rendered.group.children.length > 0) || rendered.group.comments.length > 0;
 			
-			this.plugin.skipNextRefresh = true;
-			this.plugin.highlightCommentInEditor(comment);
-			
-			setTimeout(() => {
-				this.plugin.skipNextRefresh = false;
-			}, 300);
-		});
+					if (hasContent) {
+						rendered.group.isCollapsed = true;
+						rendered.collapseIcon.textContent = '▶';
+						rendered.contentElement.style.display = 'none';
+					}
+				});
+			}
 
-		commentEl.addEventListener('mouseleave', () => {
-			commentEl.removeClass('comment-item-hover');
-		});
-	}
+			private expandAllGroups(allGroups: CommentGroup[]) {
+				this.debug('Expanding all groups');
+				this.renderedGroups.forEach(rendered => {
+					rendered.group.isCollapsed = false;
+					rendered.collapseIcon.textContent = '▼';
+					rendered.contentElement.style.display = 'block';
+				});
+			}
 
-	updateCommentInEditor(comment: CommentData, newText: string) {
-		this.debug('updateCommentInEditor called with:', newText);
-		
-		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		let currentFile = this.app.workspace.getActiveFile();
-		
-		this.debug('Active view:', !!activeView, 'Current file:', !!currentFile);
-		
-		if (!activeView && currentFile) {
-			const leaves = this.app.workspace.getLeavesOfType('markdown');
-			for (const leaf of leaves) {
-				const view = leaf.view as MarkdownView;
-				if (view.file === currentFile) {
-					activeView = view;
-					this.debug('Found view for current file in update');
-					break;
+			private collapseAllChildren(group: CommentGroup) {
+				if (group.children) {
+					group.children.forEach((child: CommentGroup) => {
+						child.isCollapsed = true;
+						this.collapseAllChildren(child);
+					});
 				}
 			}
-		}
+
+			private createCommentElement(comment: CommentData, container: Element) {
+				const commentEl = container.createEl('div', { cls: 'comment-item' });
 		
-		if (!activeView && this.currentFile) {
-			this.debug('Using stored current file for update');
-			currentFile = this.currentFile;
-			const leaves = this.app.workspace.getLeavesOfType('markdown');
-			for (const leaf of leaves) {
-				const view = leaf.view as MarkdownView;
-				if (view.file === currentFile) {
-					activeView = view;
-					this.debug('Found view for stored file in update');
-					break;
+				const contentEl = commentEl.createEl('div', { cls: 'comment-content' });
+		
+				const isMultiLine = comment.text.includes('\n');
+		
+				let textEl: HTMLElement;
+				if (isMultiLine) {
+					textEl = contentEl.createEl('textarea', { 
+						cls: 'comment-text comment-textarea',
+						attr: { 
+							spellcheck: 'false',
+							rows: (comment.text.split('\n').length + 1).toString()
+						}
+					}) as HTMLTextAreaElement;
+					(textEl as HTMLTextAreaElement).value = comment.text || '';
+				} else {
+					textEl = contentEl.createEl('div', { 
+						cls: 'comment-text',
+						attr: { contenteditable: 'true', spellcheck: 'false' }
+					});
+					textEl.textContent = comment.text || '(empty comment)';
 				}
-			}
-		}
 		
-		if (!activeView) {
-			this.debug('No active view found for updating comment');
-			return;
-		}
-
-		this.debug('Found active view, proceeding with update');
-		const editor = activeView.editor;
-		const currentContent = editor.getValue();
-		
-		this.debug('Current content length:', currentContent.length);
-		this.debug('Original comment:', comment);
-		
-		const currentComments = this.plugin.extractComments(currentContent);
-		const matchingComment = currentComments.find(c => 
-			c.text === comment.text && 
-			c.line === comment.line
-		);
-		
-		if (!matchingComment) {
-			this.debug('Could not find matching comment in current content');
-			const textMatch = currentComments.find(c => c.text === comment.text);
-			if (textMatch) {
-				this.debug('Found comment by text match');
-				this.performCommentUpdate(editor, textMatch, newText);
-			} else {
-				this.debug('Comment not found, it may have been deleted');
-				this.refresh();
-			}
-			return;
-		}
-		
-		this.debug('Found matching comment with current positions:', matchingComment);
-		this.performCommentUpdate(editor, matchingComment, newText);
-	}
-
-	private performCommentUpdate(editor: any, comment: CommentData, newText: string) {
-		const content = editor.getValue();
-		
-		const beforeComment = content.substring(0, comment.startPos);
-		const afterComment = content.substring(comment.endPos);
-		
-		const newComment = `${this.plugin.settings.commentPrefix} ${newText} ${this.plugin.settings.commentPrefix}`;
-		
-		this.debug('Replacing comment at positions', comment.startPos, '-', comment.endPos);
-		this.debug('Old comment:', comment.fullMatch);
-		this.debug('New comment:', newComment);
-		
-		const newContent = beforeComment + newComment + afterComment;
-		editor.setValue(newContent);
-		
-		new Notice('Comment updated');
-		
-		setTimeout(() => {
-			this.debug('Refreshing view after comment update');
-			this.refresh();
-		}, 100);
-	}
-
-	deleteCommentFromEditor(comment: CommentData) {
-		this.debug('deleteCommentFromEditor called for:', comment);
-		
-		let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		let currentFile = this.app.workspace.getActiveFile();
-		
-		this.debug('Delete - Active view:', !!activeView, 'Current file:', !!currentFile);
-		
-		if (!activeView && currentFile) {
-			const leaves = this.app.workspace.getLeavesOfType('markdown');
-			for (const leaf of leaves) {
-				const view = leaf.view as MarkdownView;
-				if (view.file === currentFile) {
-					activeView = view;
-					this.debug('Found view for current file in delete');
-					break;
-				}
-			}
-		}
-		
-		if (!activeView && this.currentFile) {
-			this.debug('Using stored current file for delete');
-			currentFile = this.currentFile;
-			const leaves = this.app.workspace.getLeavesOfType('markdown');
-			for (const leaf of leaves) {
-				const view = leaf.view as MarkdownView;
-				if (view.file === currentFile) {
-					activeView = view;
-					this.debug('Found view for stored file in delete');
-					break;
-				}
-			}
-		}
-		
-		if (!activeView) {
-			this.debug('No active view found for deleting comment');
-			return;
-		}
-
-		const editor = activeView.editor;
-		const currentContent = editor.getValue();
-		
-		const currentComments = this.plugin.extractComments(currentContent);
-		const matchingComment = currentComments.find(c => 
-			c.text === comment.text && 
-			c.line === comment.line
-		);
-		
-		if (!matchingComment) {
-			this.debug('Could not find matching comment to delete');
-			this.refresh();
-			return;
-		}
-		
-		this.debug('Deleting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
-		
-		const beforeComment = currentContent.substring(0, matchingComment.startPos);
-		const afterComment = currentContent.substring(matchingComment.endPos);
-		
-		const newContent = beforeComment + afterComment;
-		const finalContent = newContent.replace(/  +/g, ' ');
-		
-		editor.setValue(finalContent);
-		
-		new Notice('Comment deleted');
-		
-		setTimeout(() => {
-			this.debug('Refreshing view after comment deletion');
-			this.refresh();
-		}, 100);
-	}
-	convertCommentToCallout(comment: CommentData, customTitle?: string) {
-			this.debug('convertCommentToCallout called for:', comment, 'with title:', customTitle);
-		
-			// Use the same robust view detection as other methods
-			let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-			let currentFile = this.app.workspace.getActiveFile();
-		
-			this.debug('Convert - Active view:', !!activeView, 'Current file:', !!currentFile);
-		
-			if (!activeView && currentFile) {
-				const leaves = this.app.workspace.getLeavesOfType('markdown');
-				for (const leaf of leaves) {
-					const view = leaf.view as MarkdownView;
-					if (view.file === currentFile) {
-						activeView = view;
-						this.debug('Found view for current file in convert');
-						break;
+				const currentSearchTerm = (this as any).currentSearchTerm || '';
+				if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
+					if (textEl.tagName === 'DIV') {
+						textEl.innerHTML = this.highlightSearchText(comment.text || '(empty comment)', currentSearchTerm);
 					}
 				}
-			}
 		
-			if (!activeView && this.currentFile) {
-				this.debug('Using stored current file for convert');
-				currentFile = this.currentFile;
-				const leaves = this.app.workspace.getLeavesOfType('markdown');
-				for (const leaf of leaves) {
-					const view = leaf.view as MarkdownView;
-					if (view.file === currentFile) {
-						activeView = view;
-						this.debug('Found view for stored file in convert');
-						break;
+				const lineEl = contentEl.createEl('div', { 
+					text: `Line ${comment.line + 1}`, 
+					cls: 'comment-line' 
+				});
+
+				// Action buttons container
+				const actionsEl = commentEl.createEl('div', { cls: 'comment-actions' });
+		
+				// Save button (initially hidden)
+				const saveBtn = actionsEl.createEl('button', { 
+					text: 'Save', 
+					cls: 'comment-btn comment-save-btn' 
+				});
+				saveBtn.style.display = 'none';
+		
+				// Cancel button (initially hidden)
+				const cancelBtn = actionsEl.createEl('button', { 
+					text: 'Cancel', 
+					cls: 'comment-btn comment-cancel-btn' 
+				});
+				cancelBtn.style.display = 'none';
+
+				// Convert to Callout button
+				const convertBtn = actionsEl.createEl('button', { 
+					cls: 'comment-btn comment-convert-btn',
+					attr: { title: 'Convert to callout' }
+				});
+				// Using Lucide icon for edit/convert
+				convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+
+				// Delete button
+				const deleteBtn = actionsEl.createEl('button', { 
+					text: '×', 
+					cls: 'comment-btn comment-delete-btn',
+					attr: { title: 'Delete comment' }
+				});
+
+				// Set up event handlers
+				this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
+			}
+
+			updateCommentInEditor(comment: CommentData, newText: string) {
+				this.debug('updateCommentInEditor called with:', newText);
+		
+				let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				let currentFile = this.app.workspace.getActiveFile();
+		
+				this.debug('Active view:', !!activeView, 'Current file:', !!currentFile);
+		
+				if (!activeView && currentFile) {
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for current file in update');
+							break;
+						}
 					}
 				}
-			}
 		
-			if (!activeView) {
-				this.debug('No active view found for converting comment');
-				return;
-			}
-
-			const editor = activeView.editor;
-			const currentContent = editor.getValue();
-		
-			// Find the comment again in the current content to get fresh positions
-			const currentComments = this.plugin.extractComments(currentContent);
-			const matchingComment = currentComments.find(c => 
-				c.text === comment.text && 
-				c.line === comment.line
-			);
-		
-			if (!matchingComment) {
-				this.debug('Could not find matching comment to convert');
-				this.refresh();
-				return;
-			}
-		
-			// Extract headers for context
-			const headers = this.plugin.extractHeaders(currentContent);
-		
-			// Create the callout using the same logic as print mode but with custom title
-			const callout = this.createCalloutFromComment(matchingComment, headers, customTitle);
-		
-			this.debug('Converting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
-			this.debug('Original comment:', matchingComment.fullMatch);
-			this.debug('New callout:', callout);
-		
-			// Get the content before and after the comment
-			const beforeComment = currentContent.substring(0, matchingComment.startPos);
-			const afterComment = currentContent.substring(matchingComment.endPos);
-		
-			// Replace comment with callout
-			const newContent = beforeComment + callout + afterComment;
-		
-			editor.setValue(newContent);
-			editor.refresh();
-		
-			// Show success message
-			const titleText = customTitle ? `"${customTitle}"` : 'callout';
-			new Notice(`Comment converted to ${titleText}`);
-		
-			// Refresh the view
-			setTimeout(() => {
-				this.debug('Refreshing view after comment conversion');
-				this.refresh();
-			}, 100);
-		}
-
-		private createCalloutFromComment(comment: CommentData, headers: HeaderData[], customTitle?: string): string {
-			const calloutType = this.plugin.settings.printModeCalloutType;
-		
-			// Use custom title if provided, otherwise generate default
-			let title: string;
-			if (customTitle && customTitle.trim().length > 0) {
-				title = customTitle.trim();
-			} else {
-				// Find the nearest header for context (original logic)
-				let nearestHeader: HeaderData | null = null;
-				for (let i = headers.length - 1; i >= 0; i--) {
-					if (headers[i].line < comment.line) {
-						nearestHeader = headers[i];
-						break;
+				if (!activeView && this.currentFile) {
+					this.debug('Using stored current file for update');
+					currentFile = this.currentFile;
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for stored file in update');
+							break;
+						}
 					}
 				}
-
-				title = 'Comment';
-				if (nearestHeader) {
-					title = `Comment: ${nearestHeader.text}`;
+		
+				if (!activeView) {
+					this.debug('No active view found for updating comment');
+					return;
 				}
-			
-				// Add line number for reference
-				title += ` (Line ${comment.line + 1})`;
+
+				this.debug('Found active view, proceeding with update');
+				const editor = activeView.editor;
+				const currentContent = editor.getValue();
+		
+				this.debug('Current content length:', currentContent.length);
+				this.debug('Original comment:', comment);
+		
+				const currentComments = this.plugin.extractComments(currentContent);
+				const matchingComment = currentComments.find(c => 
+					c.text === comment.text && 
+					c.line === comment.line
+				);
+		
+				if (!matchingComment) {
+					this.debug('Could not find matching comment in current content');
+					const textMatch = currentComments.find(c => c.text === comment.text);
+					if (textMatch) {
+						this.debug('Found comment by text match');
+						this.performCommentUpdate(editor, textMatch, newText);
+					} else {
+						this.debug('Comment not found, it may have been deleted');
+						this.refresh();
+					}
+					return;
+				}
+		
+				this.debug('Found matching comment with current positions:', matchingComment);
+				this.performCommentUpdate(editor, matchingComment, newText);
 			}
 
-			// Format comment text for callout
-			const commentText = comment.text
-				.split('\n')
-				.map(line => line.trim())
-				.filter(line => line.length > 0)
-				.join('\n> ');
+			private performCommentUpdate(editor: any, comment: CommentData, newText: string) {
+				const content = editor.getValue();
+		
+				const beforeComment = content.substring(0, comment.startPos);
+				const afterComment = content.substring(comment.endPos);
+		
+				const newComment = `${this.plugin.settings.commentPrefix} ${newText} ${this.plugin.settings.commentPrefix}`;
+		
+				this.debug('Replacing comment at positions', comment.startPos, '-', comment.endPos);
+				this.debug('Old comment:', comment.fullMatch);
+				this.debug('New comment:', newComment);
+		
+				const newContent = beforeComment + newComment + afterComment;
+				editor.setValue(newContent);
+		
+				new Notice('Comment updated');
+		
+				setTimeout(() => {
+					this.debug('Refreshing view after comment update');
+					this.refresh();
+				}, 100);
+			}
 
-			// Create the callout
-			let callout = `\n> [!${calloutType}]+ ${title}\n> ${commentText}\n`;
+			deleteCommentFromEditor(comment: CommentData) {
+				this.debug('deleteCommentFromEditor called for:', comment);
+		
+				let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				let currentFile = this.app.workspace.getActiveFile();
+		
+				this.debug('Delete - Active view:', !!activeView, 'Current file:', !!currentFile);
+		
+				if (!activeView && currentFile) {
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for current file in delete');
+							break;
+						}
+					}
+				}
+		
+				if (!activeView && this.currentFile) {
+					this.debug('Using stored current file for delete');
+					currentFile = this.currentFile;
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for stored file in delete');
+							break;
+						}
+					}
+				}
+		
+				if (!activeView) {
+					this.debug('No active view found for deleting comment');
+					return;
+				}
 
-			return callout;
+				const editor = activeView.editor;
+				const currentContent = editor.getValue();
+		
+				const currentComments = this.plugin.extractComments(currentContent);
+				const matchingComment = currentComments.find(c => 
+					c.text === comment.text && 
+					c.line === comment.line
+				);
+		
+				if (!matchingComment) {
+					this.debug('Could not find matching comment to delete');
+					this.refresh();
+					return;
+				}
+		
+				this.debug('Deleting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
+		
+				const beforeComment = currentContent.substring(0, matchingComment.startPos);
+				const afterComment = currentContent.substring(matchingComment.endPos);
+		
+				const newContent = beforeComment + afterComment;
+				const finalContent = newContent.replace(/  +/g, ' ');
+		
+				editor.setValue(finalContent);
+		
+				new Notice('Comment deleted');
+		
+				setTimeout(() => {
+					this.debug('Refreshing view after comment deletion');
+					this.refresh();
+				}, 100);
+			}
+
+			convertCommentToCallout(comment: CommentData, customTitle?: string) {
+				this.debug('convertCommentToCallout called for:', comment, 'with title:', customTitle);
+	
+				// Use the same robust view detection as other methods
+				let activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				let currentFile = this.app.workspace.getActiveFile();
+	
+				this.debug('Convert - Active view:', !!activeView, 'Current file:', !!currentFile);
+	
+				if (!activeView && currentFile) {
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for current file in convert');
+							break;
+						}
+					}
+				}
+	
+				if (!activeView && this.currentFile) {
+					this.debug('Using stored current file for convert');
+					currentFile = this.currentFile;
+					const leaves = this.app.workspace.getLeavesOfType('markdown');
+					for (const leaf of leaves) {
+						const view = leaf.view as MarkdownView;
+						if (view.file === currentFile) {
+							activeView = view;
+							this.debug('Found view for stored file in convert');
+							break;
+						}
+					}
+				}
+	
+				if (!activeView) {
+					this.debug('No active view found for converting comment');
+					return;
+				}
+
+				const editor = activeView.editor;
+				const currentContent = editor.getValue();
+	
+				// Find the comment again in the current content to get fresh positions
+				const currentComments = this.plugin.extractComments(currentContent);
+				const matchingComment = currentComments.find(c => 
+					c.text === comment.text && 
+					c.line === comment.line
+				);
+	
+				if (!matchingComment) {
+					this.debug('Could not find matching comment to convert');
+					this.refresh();
+					return;
+				}
+	
+				// Extract headers for context
+				const headers = this.plugin.extractHeaders(currentContent);
+	
+				// Create the callout using the same logic as print mode but with custom title
+				const callout = this.createCalloutFromComment(matchingComment, headers, customTitle);
+	
+				this.debug('Converting comment at positions', matchingComment.startPos, '-', matchingComment.endPos);
+				this.debug('Original comment:', matchingComment.fullMatch);
+				this.debug('New callout:', callout);
+	
+				// Get the content before and after the comment
+				const beforeComment = currentContent.substring(0, matchingComment.startPos);
+				const afterComment = currentContent.substring(matchingComment.endPos);
+	
+				// Replace comment with callout
+				const newContent = beforeComment + callout + afterComment;
+	
+				editor.setValue(newContent);
+				editor.refresh();
+	
+				// Show success message
+				const titleText = customTitle ? `"${customTitle}"` : 'callout';
+				new Notice(`Comment converted to ${titleText}`);
+	
+				// Refresh the view
+				setTimeout(() => {
+					this.debug('Refreshing view after comment conversion');
+					this.refresh();
+				}, 100);
+			}
+
+			private createCalloutFromComment(comment: CommentData, headers: HeaderData[], customTitle?: string): string {
+				const calloutType = this.plugin.settings.printModeCalloutType;
+	
+				// Use custom title if provided, otherwise generate default
+				let title: string;
+				if (customTitle && customTitle.trim().length > 0) {
+					title = customTitle.trim();
+				} else {
+					// Find the nearest header for context (original logic)
+					let nearestHeader: HeaderData | null = null;
+					for (let i = headers.length - 1; i >= 0; i--) {
+						if (headers[i].line < comment.line) {
+							nearestHeader = headers[i];
+							break;
+						}
+					}
+
+					title = 'Comment';
+					if (nearestHeader) {
+						title = `Comment: ${nearestHeader.text}`;
+					}
+		
+					// Add line number for reference
+					title += ` (Line ${comment.line + 1})`;
+				}
+
+				// Format comment text for callout
+				const commentText = comment.text
+					.split('\n')
+					.map(line => line.trim())
+					.filter(line => line.length > 0)
+					.join('\n> ');
+
+				// Create the callout
+				let callout = `\n> [!${calloutType}]+ ${title}\n> ${commentText}\n`;
+
+				return callout;
+			}
 		}
-}
 
-// Settings tab class with Print Mode settings
-class CommentsManagerSettingTab extends PluginSettingTab {
-	plugin: CommentsManagerPlugin;
+		// Settings tab class with Print Mode settings and view mode preference
+		class CommentsManagerSettingTab extends PluginSettingTab {
+			plugin: CommentsManagerPlugin;
 
-	constructor(app: App, plugin: CommentsManagerPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
+			constructor(app: App, plugin: CommentsManagerPlugin) {
+				super(app, plugin);
+				this.plugin = plugin;
+			}
 
-	display(): void {
-		const { containerEl } = this;
+			display(): void {
+				const { containerEl } = this;
 
-		containerEl.empty();
+				containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Comments Manager Settings' });
+				containerEl.createEl('h2', { text: 'Comments Manager Settings' });
 
-		new Setting(containerEl)
-			.setName('Comment prefix')
-			.setDesc('The characters used to mark comments (e.g., %% for Obsidian comments)')
-			.addText(text => text
-				.setPlaceholder('%%')
-				.setValue(this.plugin.settings.commentPrefix)
-				.onChange(async (value) => {
-					this.plugin.settings.commentPrefix = value || '%%';
-					await this.plugin.saveSettings();
-					this.plugin.refreshCommentsView();
-				}));
+				new Setting(containerEl)
+					.setName('Comment prefix')
+					.setDesc('The characters used to mark comments (e.g., %% for Obsidian comments)')
+					.addText(text => text
+						.setPlaceholder('%%')
+						.setValue(this.plugin.settings.commentPrefix)
+						.onChange(async (value) => {
+							this.plugin.settings.commentPrefix = value || '%%';
+							await this.plugin.saveSettings();
+							this.plugin.refreshCommentsView();
+						}));
 
-		new Setting(containerEl)
-			.setName('Open panel on startup')
-			.setDesc('Automatically open the comments panel when Obsidian starts')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.openOnStart)
-				.onChange(async (value) => {
-					this.plugin.settings.openOnStart = value;
-					await this.plugin.saveSettings();
-				}));
+				new Setting(containerEl)
+					.setName('Open panel on startup')
+					.setDesc('Automatically open the comments panel when Obsidian starts')
+					.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.openOnStart)
+						.onChange(async (value) => {
+							this.plugin.settings.openOnStart = value;
+							await this.plugin.saveSettings();
+						}));
 
-		new Setting(containerEl)
-			.setName('Default collapsed view')
-			.setDesc('Start with comments panel in collapsed state (showing only headers)')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.defaultCollapsed)
-				.onChange(async (value) => {
-					this.plugin.settings.defaultCollapsed = value;
-					await this.plugin.saveSettings();
-					this.plugin.refreshCommentsView();
-				}));
+				new Setting(containerEl)
+					.setName('Default view mode')
+					.setDesc('Choose the default view mode for the comments panel')
+					.addDropdown(dropdown => dropdown
+						.addOption('outliner', 'Outliner (grouped by headers)')
+						.addOption('list', 'List (flat list of comments)')
+						.setValue(this.plugin.settings.defaultViewMode)
+						.onChange(async (value: 'outliner' | 'list') => {
+							this.plugin.settings.defaultViewMode = value;
+							await this.plugin.saveSettings();
+							this.plugin.refreshCommentsView();
+						}));
 
-		new Setting(containerEl)
-			.setName('Debug mode')
-			.setDesc('Enable debug logging in the developer console (for troubleshooting)')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.debugMode)
-				.onChange(async (value) => {
-					this.plugin.settings.debugMode = value;
-					await this.plugin.saveSettings();
-				}));
+				new Setting(containerEl)
+					.setName('Default collapsed view')
+					.setDesc('Start with comments panel in collapsed state (applies to outliner view only)')
+					.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.defaultCollapsed)
+						.onChange(async (value) => {
+							this.plugin.settings.defaultCollapsed = value;
+							await this.plugin.saveSettings();
+							this.plugin.refreshCommentsView();
+						}));
 
-		// Print Mode Settings Section
-		containerEl.createEl('h3', { text: 'Print Mode Settings' });
+				new Setting(containerEl)
+					.setName('Debug mode')
+					.setDesc('Enable debug logging in the developer console (for troubleshooting)')
+					.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.debugMode)
+						.onChange(async (value) => {
+							this.plugin.settings.debugMode = value;
+							await this.plugin.saveSettings();
+						}));
 
-		new Setting(containerEl)
-			.setName('Callout type for print mode')
-			.setDesc('The type of callout to use when converting comments (e.g., comment, note, info)')
-			.addText(text => text
-				.setPlaceholder('comment')
-				.setValue(this.plugin.settings.printModeCalloutType)
-				.onChange(async (value) => {
-					this.plugin.settings.printModeCalloutType = value || 'comment';
-					await this.plugin.saveSettings();
-				}));
+				// Print Mode Settings Section
+				containerEl.createEl('h3', { text: 'Print Mode Settings' });
 
-		new Setting(containerEl)
-			.setName('Include comment author')
-			.setDesc('Include author information in converted callouts (placeholder for future feature)')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.includeCommentAuthor)
-				.onChange(async (value) => {
-					this.plugin.settings.includeCommentAuthor = value;
-					await this.plugin.saveSettings();
-				}));
+				new Setting(containerEl)
+					.setName('Callout type for print mode')
+					.setDesc('The type of callout to use when converting comments (e.g., comment, note, info)')
+					.addText(text => text
+						.setPlaceholder('comment')
+						.setValue(this.plugin.settings.printModeCalloutType)
+						.onChange(async (value) => {
+							this.plugin.settings.printModeCalloutType = value || 'comment';
+							await this.plugin.saveSettings();
+						}));
 
-		new Setting(containerEl)
-			.setName('Include comment timestamp')
-			.setDesc('Include timestamp information in converted callouts (placeholder for future feature)')
-			.addToggle(toggle => toggle
-				.setValue(this.plugin.settings.includeCommentTimestamp)
-				.onChange(async (value) => {
-					this.plugin.settings.includeCommentTimestamp = value;
-					await this.plugin.saveSettings();
-				}));
+				new Setting(containerEl)
+					.setName('Include comment author')
+					.setDesc('Include author information in converted callouts (placeholder for future feature)')
+					.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.includeCommentAuthor)
+						.onChange(async (value) => {
+							this.plugin.settings.includeCommentAuthor = value;
+							await this.plugin.saveSettings();
+						}));
 
-		// Print Mode Usage Instructions
-		const instructionsEl = containerEl.createEl('div', { cls: 'print-mode-instructions' });
-		instructionsEl.createEl('h4', { text: 'How to use Print Mode:' });
-		const instructionsList = instructionsEl.createEl('ol');
-		instructionsList.createEl('li', { text: 'Click the print icon in the Comments panel or use the command "Activate Print Mode"' });
-		instructionsList.createEl('li', { text: 'Preview how your document will look with comments converted to callouts' });
-		instructionsList.createEl('li', { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
-		instructionsList.createEl('li', { text: 'Your original document remains unchanged - comments are converted temporarily' });
-	}
+				new Setting(containerEl)
+					.setName('Include comment timestamp')
+					.setDesc('Include timestamp information in converted callouts (placeholder for future feature)')
+					.addToggle(toggle => toggle
+						.setValue(this.plugin.settings.includeCommentTimestamp)
+						.onChange(async (value) => {
+							this.plugin.settings.includeCommentTimestamp = value;
+							await this.plugin.saveSettings();
+						}));
+
+				// Usage Instructions
+				const instructionsEl = containerEl.createEl('div', { cls: 'print-mode-instructions' });
+				instructionsEl.createEl('h4', { text: 'View Modes:' });
+				const viewModesList = instructionsEl.createEl('ul');
+				viewModesList.createEl('li', { text: 'Outliner View: Comments are grouped under their nearest preceding header in a hierarchical tree structure' });
+				viewModesList.createEl('li', { text: 'List View: Comments are shown in a flat list in document order, without any grouping' });
+		
+				instructionsEl.createEl('h4', { text: 'How to use Print Mode:' });
+				const instructionsList = instructionsEl.createEl('ol');
+				instructionsList.createEl('li', { text: 'Click the printer icon button in the Comments panel or use the command "Activate Print Mode"' });
+				instructionsList.createEl('li', { text: 'Preview how your document will look with comments converted to callouts' });
+				instructionsList.createEl('li', { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
+				instructionsList.createEl('li', { text: 'Your original document remains unchanged - comments are converted temporarily' });
+			}
 }

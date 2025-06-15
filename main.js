@@ -34,6 +34,7 @@ var DEFAULT_SETTINGS = {
   openOnStart: true,
   debugMode: false,
   defaultCollapsed: true,
+  defaultViewMode: "outliner",
   // Print Mode defaults
   printModeCalloutType: "comment",
   includeCommentAuthor: false,
@@ -41,7 +42,6 @@ var DEFAULT_SETTINGS = {
 };
 var COMMENTS_VIEW_TYPE = "comments-manager-view";
 var PrintModePreviewModal = class extends import_obsidian.Modal {
-  // Store the active view reference
   constructor(app, plugin, originalContent, convertedContent, activeView) {
     super(app);
     this.plugin = plugin;
@@ -213,7 +213,7 @@ var CommentsManagerPlugin = class extends import_obsidian.Plugin {
       COMMENTS_VIEW_TYPE,
       (leaf) => new CommentsView(leaf, this)
     );
-    this.addRibbonIcon("message-square", "Toggle Comments Panel", () => {
+    this.addRibbonIcon("percent", "Toggle Comments Panel", () => {
       this.activateView();
     });
     this.addCommand({
@@ -587,8 +587,10 @@ var CommentsView = class extends import_obsidian.ItemView {
     this.renderedGroups = [];
     this.isCollapsed = false;
     this.hasManualExpansions = false;
+    this.currentViewMode = "outliner";
     this.plugin = plugin;
     this.isCollapsed = plugin.settings.defaultCollapsed;
+    this.currentViewMode = plugin.settings.defaultViewMode;
   }
   debug(message, ...args) {
     if (this.plugin.settings.debugMode) {
@@ -617,17 +619,31 @@ var CommentsView = class extends import_obsidian.ItemView {
     const titleRow = header.createEl("div", { cls: "comments-title-row" });
     titleRow.createEl("h4", { text: "Comments", cls: "comments-title" });
     const controlsContainer = titleRow.createEl("div", { cls: "comments-controls" });
+    const viewModeContainer = controlsContainer.createEl("div", { cls: "view-mode-toggle" });
+    const outlinerBtn = viewModeContainer.createEl("button", {
+      cls: `view-mode-btn ${this.currentViewMode === "outliner" ? "active" : ""}`,
+      attr: { title: "Outliner view (grouped by headers)" }
+    });
+    outlinerBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>';
+    const listBtn = viewModeContainer.createEl("button", {
+      cls: `view-mode-btn ${this.currentViewMode === "list" ? "active" : ""}`,
+      attr: { title: "List view (flat list of comments)" }
+    });
+    listBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>';
     const printModeBtn = controlsContainer.createEl("button", {
       cls: "comments-control-btn print-mode-btn",
       attr: { title: "Convert comments to callouts for printing" }
     });
-    (0, import_obsidian.setIcon)(printModeBtn, "printer");
+    printModeBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 6,2 18,2 18,9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>';
     const toggleAllBtn = controlsContainer.createEl("button", {
       cls: "comments-toggle-btn",
       attr: { title: "Toggle collapse/expand all sections" }
     });
     const toggleIcon = toggleAllBtn.createEl("span", { cls: "comments-toggle-icon" });
-    (0, import_obsidian.setIcon)(toggleIcon, this.isCollapsed ? "plus" : "minus");
+    toggleIcon.innerHTML = this.isCollapsed ? "+" : "-";
+    if (this.currentViewMode === "list") {
+      toggleAllBtn.style.display = "none";
+    }
     const searchContainer = header.createEl("div", { cls: "comments-search-container" });
     const searchInput = searchContainer.createEl("input", {
       type: "text",
@@ -641,7 +657,17 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comments-clear-search",
       attr: { title: "Clear search" }
     });
-    (0, import_obsidian.setIcon)(clearSearchBtn, "x");
+    clearSearchBtn.innerHTML = "\xD7";
+    outlinerBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.switchViewMode("outliner", outlinerBtn, listBtn, toggleAllBtn);
+    };
+    listBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.switchViewMode("list", outlinerBtn, listBtn, toggleAllBtn);
+    };
     setTimeout(() => {
       this.debug("Executing delayed refresh check");
       let activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
@@ -689,6 +715,22 @@ var CommentsView = class extends import_obsidian.ItemView {
       }
     }, 10);
   }
+  switchViewMode(newMode, outlinerBtn, listBtn, toggleAllBtn) {
+    this.debug("Switching view mode to:", newMode);
+    this.currentViewMode = newMode;
+    if (newMode === "outliner") {
+      outlinerBtn.addClass("active");
+      listBtn.removeClass("active");
+      toggleAllBtn.style.display = "flex";
+    } else {
+      listBtn.addClass("active");
+      outlinerBtn.removeClass("active");
+      toggleAllBtn.style.display = "none";
+    }
+    this.plugin.settings.defaultViewMode = newMode;
+    this.plugin.saveSettings();
+    this.refresh();
+  }
   processComments(content, container, toggleBtn, toggleIcon, searchInput, clearSearchBtn, printModeBtn) {
     this.debug("Processing comments for content of length:", content.length);
     const currentStates = /* @__PURE__ */ new Map();
@@ -701,8 +743,7 @@ var CommentsView = class extends import_obsidian.ItemView {
     this.renderedGroups = [];
     const comments = this.plugin.extractComments(content);
     const headers = this.plugin.extractHeaders(content);
-    const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
-    this.debug("Found", comments.length, "comments in", commentGroups.length, "groups");
+    this.debug("Found", comments.length, "comments in view mode:", this.currentViewMode);
     if (comments.length === 0) {
       container.createEl("div", {
         text: "No comments found",
@@ -724,17 +765,18 @@ var CommentsView = class extends import_obsidian.ItemView {
       };
     }
     const commentsList = container.createEl("div", { cls: "comments-list" });
-    const allGroups = [];
-    const collectAllGroups = (groups) => {
-      groups.forEach((group) => {
-        allGroups.push(group);
-        if (group.children) {
-          collectAllGroups(group.children);
-        }
-      });
-    };
-    collectAllGroups(commentGroups);
-    if (toggleBtn && toggleIcon) {
+    if (toggleBtn && toggleIcon && this.currentViewMode === "outliner") {
+      const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
+      const allGroups = [];
+      const collectAllGroups = (groups) => {
+        groups.forEach((group) => {
+          allGroups.push(group);
+          if (group.children) {
+            collectAllGroups(group.children);
+          }
+        });
+      };
+      collectAllGroups(commentGroups);
       toggleBtn.onclick = (e) => {
         this.debug("Toggle button clicked, current state:", this.isCollapsed);
         e.preventDefault();
@@ -749,7 +791,12 @@ var CommentsView = class extends import_obsidian.ItemView {
       const performSearch = () => {
         const searchTerm = searchInput.value.toLowerCase().trim();
         currentSearchTerm = searchTerm;
-        this.filterComments(commentsList, commentGroups, searchTerm);
+        if (this.currentViewMode === "outliner") {
+          const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
+          this.filterComments(commentsList, commentGroups, searchTerm);
+        } else {
+          this.filterListComments(commentsList, comments, searchTerm);
+        }
         if (searchTerm) {
           clearSearchBtn.style.display = "block";
         } else {
@@ -774,6 +821,14 @@ var CommentsView = class extends import_obsidian.ItemView {
       });
       clearSearchBtn.style.display = "none";
     }
+    if (this.currentViewMode === "outliner") {
+      this.renderOutlinerView(comments, headers, commentsList, currentStates);
+    } else {
+      this.renderListView(comments, commentsList);
+    }
+  }
+  renderOutlinerView(comments, headers, commentsList, currentStates) {
+    const commentGroups = this.plugin.groupCommentsByHeaders(comments, headers);
     commentGroups.forEach((group) => {
       if (this.isCollapsed && !this.hasManualExpansions) {
         this.setGroupCollapsedRecursively(group, true);
@@ -786,236 +841,25 @@ var CommentsView = class extends import_obsidian.ItemView {
     this.debug("Rendered groups count:", this.renderedGroups.length);
     this.debug("Initial collapsed state:", this.isCollapsed, "hasManualExpansions:", this.hasManualExpansions);
   }
-  restoreExpansionStates(groups, states) {
-    const restoreGroup = (group) => {
-      if (group.header) {
-        const key = `${group.header.level}-${group.header.text}`;
-        const wasExpanded = states.get(key);
-        if (wasExpanded !== void 0) {
-          group.isCollapsed = !wasExpanded;
-          const rendered = this.renderedGroups.find(
-            (r) => r.group.header && r.group.header.level === group.header.level && r.group.header.text === group.header.text
-          );
-          if (rendered) {
-            (0, import_obsidian.setIcon)(rendered.collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
-            rendered.contentElement.style.display = group.isCollapsed ? "none" : "block";
-          }
-        }
-      }
-      if (group.children) {
-        group.children.forEach(restoreGroup);
-      }
-    };
-    groups.forEach(restoreGroup);
-  }
-  setGroupCollapsedRecursively(group, collapsed) {
-    group.isCollapsed = collapsed;
-    if (group.children) {
-      group.children.forEach((child) => {
-        this.setGroupCollapsedRecursively(child, collapsed);
-      });
-    }
-  }
-  highlightSearchText(text, searchTerm) {
-    if (!searchTerm) return text;
-    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
-    return text.replace(regex, '<mark class="search-highlight">$1</mark>');
-  }
-  filterComments(commentsList, commentGroups, searchTerm) {
-    commentsList.empty();
-    if (!searchTerm) {
-      commentGroups.forEach((group) => {
-        this.renderCommentGroup(group, commentsList, 0);
-      });
-      return;
-    }
-    const filteredGroups = this.filterGroupsRecursively(commentGroups, searchTerm);
-    if (filteredGroups.length === 0) {
-      commentsList.createEl("div", {
-        text: "No matching comments found",
-        cls: "comments-empty"
-      });
-      return;
-    }
-    filteredGroups.forEach((group) => {
-      this.renderCommentGroup(group, commentsList, 0);
+  renderListView(comments, commentsList) {
+    this.debug("Rendering list view with", comments.length, "comments");
+    const sortedComments = [...comments].sort((a, b) => a.line - b.line);
+    const listContainer = commentsList.createEl("div", { cls: "comments-list-flat" });
+    sortedComments.forEach((comment, index) => {
+      this.createListCommentElement(comment, listContainer, index + 1);
     });
   }
-  filterGroupsRecursively(groups, searchTerm) {
-    const filtered = [];
-    groups.forEach((group) => {
-      var _a;
-      const headerMatches = ((_a = group.header) == null ? void 0 : _a.text.toLowerCase().includes(searchTerm)) || false;
-      const matchingComments = group.comments.filter(
-        (comment) => comment.text.toLowerCase().includes(searchTerm)
-      );
-      const filteredChildren = group.children ? this.filterGroupsRecursively(group.children, searchTerm) : [];
-      if (headerMatches || matchingComments.length > 0 || filteredChildren.length > 0) {
-        const filteredGroup = {
-          header: group.header,
-          comments: headerMatches ? group.comments : matchingComments,
-          children: filteredChildren.length > 0 ? filteredChildren : void 0,
-          parent: group.parent,
-          isCollapsed: false
-        };
-        filtered.push(filteredGroup);
-      }
+  createListCommentElement(comment, container, commentNumber) {
+    const commentEl = container.createEl("div", { cls: "comment-item comment-list-item" });
+    const headerEl = commentEl.createEl("div", { cls: "comment-list-header" });
+    const numberEl = headerEl.createEl("span", {
+      text: `${commentNumber}`,
+      cls: "comment-list-number"
     });
-    return filtered;
-  }
-  renderCommentGroup(group, container, depth) {
-    const headerSection = container.createEl("div", { cls: "comment-header-section" });
-    headerSection.style.marginLeft = `${depth * 12}px`;
-    const headerEl = headerSection.createEl("div", { cls: "comment-header" });
-    const collapseIcon = headerEl.createEl("span", { cls: "comment-collapse-icon" });
-    const hasChildren = group.children && group.children.length > 0 || group.comments.length > 0;
-    if (hasChildren) {
-      (0, import_obsidian.setIcon)(collapseIcon, group.isCollapsed ? "chevron-right" : "chevron-down");
-      collapseIcon.style.visibility = "visible";
-    } else {
-      collapseIcon.style.visibility = "hidden";
-    }
-    const headerText = headerEl.createEl("span", { cls: "comment-header-text" });
-    if (group.header) {
-      const totalComments = this.countTotalComments(group);
-      if (totalComments > 0) {
-        headerText.textContent = `${group.header.text} (${totalComments})`;
-      } else {
-        headerText.textContent = group.header.text;
-      }
-    } else {
-      headerText.textContent = `No Header (${group.comments.length})`;
-    }
-    const groupContent = headerSection.createEl("div", { cls: "comment-group-content" });
-    if (group.isCollapsed) {
-      groupContent.style.display = "none";
-    }
-    if (hasChildren) {
-      this.renderedGroups.push({
-        group,
-        collapseIcon,
-        contentElement: groupContent
-      });
-    }
-    if (hasChildren) {
-      collapseIcon.addEventListener("click", (e) => {
-        var _a;
-        this.debug("Collapse icon clicked for group:", ((_a = group.header) == null ? void 0 : _a.text) || "No Header");
-        e.preventDefault();
-        e.stopPropagation();
-        this.toggleGroupCollapse(group, collapseIcon, groupContent);
-      });
-    }
-    if (group.header) {
-      headerText.addEventListener("click", (e) => {
-        this.debug("Header text clicked, navigating to:", group.header.text);
-        e.preventDefault();
-        e.stopPropagation();
-        this.plugin.skipNextRefresh = true;
-        this.plugin.highlightHeaderInEditor(group.header);
-        setTimeout(() => {
-          this.plugin.skipNextRefresh = false;
-        }, 100);
-        return false;
-      });
-      headerEl.addEventListener("click", (e) => {
-        if (e.target === collapseIcon || e.target === headerText) {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        return false;
-      });
-    }
-    if (group.comments.length > 0) {
-      const groupComments = groupContent.createEl("div", { cls: "comment-group-comments" });
-      group.comments.forEach((comment) => {
-        this.createCommentElement(comment, groupComments);
-      });
-    }
-    if (group.children) {
-      group.children.forEach((childGroup) => {
-        this.renderCommentGroup(childGroup, groupContent, depth + 1);
-      });
-    }
-  }
-  countTotalComments(group) {
-    let total = group.comments.length;
-    if (group.children) {
-      group.children.forEach((child) => {
-        total += this.countTotalComments(child);
-      });
-    }
-    return total;
-  }
-  toggleGroupCollapse(group, icon, content) {
-    group.isCollapsed = !group.isCollapsed;
-    if (group.isCollapsed) {
-      (0, import_obsidian.setIcon)(icon, "chevron-right");
-      content.style.display = "none";
-    } else {
-      (0, import_obsidian.setIcon)(icon, "chevron-down");
-      content.style.display = "block";
-      this.hasManualExpansions = true;
-    }
-    if (group.isCollapsed && group.children) {
-      this.collapseAllChildren(group);
-    }
-    this.debug("Group toggled, hasManualExpansions:", this.hasManualExpansions);
-  }
-  toggleAllGroups(toggleIcon) {
-    this.debug("toggleAllGroups called, current state:", this.isCollapsed);
-    if (this.isCollapsed) {
-      this.debug("Expanding all groups");
-      this.expandAllGroups([]);
-      this.hasManualExpansions = false;
-    } else {
-      this.debug("Collapsing all groups to top level overview");
-      this.collapseAllGroups([]);
-      this.hasManualExpansions = false;
-    }
-    this.isCollapsed = !this.isCollapsed;
-    this.updateToggleButton(toggleIcon);
-    this.debug("toggleAllGroups completed, new state:", this.isCollapsed);
-  }
-  updateToggleButton(toggleIcon) {
-    if (this.isCollapsed) {
-      (0, import_obsidian.setIcon)(toggleIcon, "plus");
-      toggleIcon.parentElement.setAttribute("title", "Expand all sections");
-    } else {
-      (0, import_obsidian.setIcon)(toggleIcon, "minus");
-      toggleIcon.parentElement.setAttribute("title", "Collapse all sections");
-    }
-  }
-  collapseAllGroups(allGroups) {
-    this.debug("Collapsing all groups to top level overview");
-    this.renderedGroups.forEach((rendered) => {
-      const hasContent = rendered.group.children && rendered.group.children.length > 0 || rendered.group.comments.length > 0;
-      if (hasContent) {
-        rendered.group.isCollapsed = true;
-        (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-right");
-        rendered.contentElement.style.display = "none";
-      }
+    const lineEl = headerEl.createEl("span", {
+      text: `Line ${comment.line + 1}`,
+      cls: "comment-list-line"
     });
-  }
-  expandAllGroups(allGroups) {
-    this.debug("Expanding all groups");
-    this.renderedGroups.forEach((rendered) => {
-      rendered.group.isCollapsed = false;
-      (0, import_obsidian.setIcon)(rendered.collapseIcon, "chevron-down");
-      rendered.contentElement.style.display = "block";
-    });
-  }
-  collapseAllChildren(group) {
-    if (group.children) {
-      group.children.forEach((child) => {
-        child.isCollapsed = true;
-        this.collapseAllChildren(child);
-      });
-    }
-  }
-  createCommentElement(comment, container) {
-    const commentEl = container.createEl("div", { cls: "comment-item" });
     const contentEl = commentEl.createEl("div", { cls: "comment-content" });
     const isMultiLine = comment.text.includes("\n");
     let textEl;
@@ -1041,10 +885,6 @@ var CommentsView = class extends import_obsidian.ItemView {
         textEl.innerHTML = this.highlightSearchText(comment.text || "(empty comment)", currentSearchTerm);
       }
     }
-    const lineEl = contentEl.createEl("div", {
-      text: `Line ${comment.line + 1}`,
-      cls: "comment-line"
-    });
     const actionsEl = commentEl.createEl("div", { cls: "comment-actions" });
     const saveBtn = actionsEl.createEl("button", {
       text: "Save",
@@ -1060,12 +900,37 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: "comment-btn comment-convert-btn",
       attr: { title: "Convert to callout" }
     });
-    (0, import_obsidian.setIcon)(convertBtn, "pencil");
+    convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
     const deleteBtn = actionsEl.createEl("button", {
+      text: "\xD7",
       cls: "comment-btn comment-delete-btn",
       attr: { title: "Delete comment" }
     });
-    (0, import_obsidian.setIcon)(deleteBtn, "trash");
+    this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
+  }
+  filterListComments(commentsList, comments, searchTerm) {
+    commentsList.empty();
+    if (!searchTerm) {
+      this.renderListView(comments, commentsList.parentElement);
+      return;
+    }
+    const filteredComments = comments.filter(
+      (comment) => comment.text.toLowerCase().includes(searchTerm)
+    );
+    if (filteredComments.length === 0) {
+      commentsList.createEl("div", {
+        text: "No matching comments found",
+        cls: "comments-empty"
+      });
+      return;
+    }
+    const listContainer = commentsList.createEl("div", { cls: "comments-list-flat" });
+    const sortedComments = [...filteredComments].sort((a, b) => a.line - b.line);
+    sortedComments.forEach((comment, index) => {
+      this.createListCommentElement(comment, listContainer, index + 1);
+    });
+  }
+  setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm) {
     convertBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       new CommentConversionModal(this.app, comment, (customTitle) => {
@@ -1202,6 +1067,288 @@ var CommentsView = class extends import_obsidian.ItemView {
     commentEl.addEventListener("mouseleave", () => {
       commentEl.removeClass("comment-item-hover");
     });
+  }
+  restoreExpansionStates(groups, states) {
+    const restoreGroup = (group) => {
+      if (group.header) {
+        const key = `${group.header.level}-${group.header.text}`;
+        const wasExpanded = states.get(key);
+        if (wasExpanded !== void 0) {
+          group.isCollapsed = !wasExpanded;
+          const rendered = this.renderedGroups.find(
+            (r) => r.group.header && r.group.header.level === group.header.level && r.group.header.text === group.header.text
+          );
+          if (rendered) {
+            rendered.collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+            rendered.contentElement.style.display = group.isCollapsed ? "none" : "block";
+          }
+        }
+      }
+      if (group.children) {
+        group.children.forEach(restoreGroup);
+      }
+    };
+    groups.forEach(restoreGroup);
+  }
+  setGroupCollapsedRecursively(group, collapsed) {
+    group.isCollapsed = collapsed;
+    if (group.children) {
+      group.children.forEach((child) => {
+        this.setGroupCollapsedRecursively(child, collapsed);
+      });
+    }
+  }
+  highlightSearchText(text, searchTerm) {
+    if (!searchTerm) return text;
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+    return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+  }
+  filterComments(commentsList, commentGroups, searchTerm) {
+    commentsList.empty();
+    if (!searchTerm) {
+      commentGroups.forEach((group) => {
+        this.renderCommentGroup(group, commentsList, 0);
+      });
+      return;
+    }
+    const filteredGroups = this.filterGroupsRecursively(commentGroups, searchTerm);
+    if (filteredGroups.length === 0) {
+      commentsList.createEl("div", {
+        text: "No matching comments found",
+        cls: "comments-empty"
+      });
+      return;
+    }
+    filteredGroups.forEach((group) => {
+      this.renderCommentGroup(group, commentsList, 0);
+    });
+  }
+  filterGroupsRecursively(groups, searchTerm) {
+    const filtered = [];
+    groups.forEach((group) => {
+      var _a;
+      const headerMatches = ((_a = group.header) == null ? void 0 : _a.text.toLowerCase().includes(searchTerm)) || false;
+      const matchingComments = group.comments.filter(
+        (comment) => comment.text.toLowerCase().includes(searchTerm)
+      );
+      const filteredChildren = group.children ? this.filterGroupsRecursively(group.children, searchTerm) : [];
+      if (headerMatches || matchingComments.length > 0 || filteredChildren.length > 0) {
+        const filteredGroup = {
+          header: group.header,
+          comments: headerMatches ? group.comments : matchingComments,
+          children: filteredChildren.length > 0 ? filteredChildren : void 0,
+          parent: group.parent,
+          isCollapsed: false
+        };
+        filtered.push(filteredGroup);
+      }
+    });
+    return filtered;
+  }
+  renderCommentGroup(group, container, depth) {
+    const headerSection = container.createEl("div", { cls: "comment-header-section" });
+    headerSection.style.marginLeft = `${depth * 12}px`;
+    const headerEl = headerSection.createEl("div", { cls: "comment-header" });
+    const collapseIcon = headerEl.createEl("span", { cls: "comment-collapse-icon" });
+    const hasChildren = group.children && group.children.length > 0 || group.comments.length > 0;
+    if (hasChildren) {
+      collapseIcon.textContent = group.isCollapsed ? "\u25B6" : "\u25BC";
+      collapseIcon.style.visibility = "visible";
+    } else {
+      collapseIcon.style.visibility = "hidden";
+    }
+    const headerText = headerEl.createEl("span", { cls: "comment-header-text" });
+    if (group.header) {
+      const totalComments = this.countTotalComments(group);
+      if (totalComments > 0) {
+        headerText.textContent = `${group.header.text} (${totalComments})`;
+      } else {
+        headerText.textContent = group.header.text;
+      }
+    } else {
+      headerText.textContent = `No Header (${group.comments.length})`;
+    }
+    const groupContent = headerSection.createEl("div", { cls: "comment-group-content" });
+    if (group.isCollapsed) {
+      groupContent.style.display = "none";
+    }
+    if (hasChildren) {
+      this.renderedGroups.push({
+        group,
+        collapseIcon,
+        contentElement: groupContent
+      });
+    }
+    if (hasChildren) {
+      collapseIcon.addEventListener("click", (e) => {
+        var _a;
+        this.debug("Collapse icon clicked for group:", ((_a = group.header) == null ? void 0 : _a.text) || "No Header");
+        e.preventDefault();
+        e.stopPropagation();
+        this.toggleGroupCollapse(group, collapseIcon, groupContent);
+      });
+    }
+    if (group.header) {
+      headerText.addEventListener("click", (e) => {
+        this.debug("Header text clicked, navigating to:", group.header.text);
+        e.preventDefault();
+        e.stopPropagation();
+        this.plugin.skipNextRefresh = true;
+        this.plugin.highlightHeaderInEditor(group.header);
+        setTimeout(() => {
+          this.plugin.skipNextRefresh = false;
+        }, 100);
+        return false;
+      });
+      headerEl.addEventListener("click", (e) => {
+        if (e.target === collapseIcon || e.target === headerText) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      });
+    }
+    if (group.comments.length > 0) {
+      const groupComments = groupContent.createEl("div", { cls: "comment-group-comments" });
+      group.comments.forEach((comment) => {
+        this.createCommentElement(comment, groupComments);
+      });
+    }
+    if (group.children) {
+      group.children.forEach((childGroup) => {
+        this.renderCommentGroup(childGroup, groupContent, depth + 1);
+      });
+    }
+  }
+  countTotalComments(group) {
+    let total = group.comments.length;
+    if (group.children) {
+      group.children.forEach((child) => {
+        total += this.countTotalComments(child);
+      });
+    }
+    return total;
+  }
+  toggleGroupCollapse(group, icon, content) {
+    group.isCollapsed = !group.isCollapsed;
+    if (group.isCollapsed) {
+      icon.textContent = "\u25B6";
+      content.style.display = "none";
+    } else {
+      icon.textContent = "\u25BC";
+      content.style.display = "block";
+      this.hasManualExpansions = true;
+    }
+    if (group.isCollapsed && group.children) {
+      this.collapseAllChildren(group);
+    }
+    this.debug("Group toggled, hasManualExpansions:", this.hasManualExpansions);
+  }
+  toggleAllGroups(toggleIcon) {
+    this.debug("toggleAllGroups called, current state:", this.isCollapsed);
+    if (this.isCollapsed) {
+      this.debug("Expanding all groups");
+      this.expandAllGroups([]);
+      this.hasManualExpansions = false;
+    } else {
+      this.debug("Collapsing all groups to top level overview");
+      this.collapseAllGroups([]);
+      this.hasManualExpansions = false;
+    }
+    this.isCollapsed = !this.isCollapsed;
+    this.updateToggleButton(toggleIcon);
+    this.debug("toggleAllGroups completed, new state:", this.isCollapsed);
+  }
+  updateToggleButton(toggleIcon) {
+    if (this.isCollapsed) {
+      toggleIcon.innerHTML = "+";
+      toggleIcon.parentElement.setAttribute("title", "Expand all sections");
+    } else {
+      toggleIcon.innerHTML = "-";
+      toggleIcon.parentElement.setAttribute("title", "Collapse all sections");
+    }
+  }
+  collapseAllGroups(allGroups) {
+    this.debug("Collapsing all groups to top level overview");
+    this.renderedGroups.forEach((rendered) => {
+      const hasContent = rendered.group.children && rendered.group.children.length > 0 || rendered.group.comments.length > 0;
+      if (hasContent) {
+        rendered.group.isCollapsed = true;
+        rendered.collapseIcon.textContent = "\u25B6";
+        rendered.contentElement.style.display = "none";
+      }
+    });
+  }
+  expandAllGroups(allGroups) {
+    this.debug("Expanding all groups");
+    this.renderedGroups.forEach((rendered) => {
+      rendered.group.isCollapsed = false;
+      rendered.collapseIcon.textContent = "\u25BC";
+      rendered.contentElement.style.display = "block";
+    });
+  }
+  collapseAllChildren(group) {
+    if (group.children) {
+      group.children.forEach((child) => {
+        child.isCollapsed = true;
+        this.collapseAllChildren(child);
+      });
+    }
+  }
+  createCommentElement(comment, container) {
+    const commentEl = container.createEl("div", { cls: "comment-item" });
+    const contentEl = commentEl.createEl("div", { cls: "comment-content" });
+    const isMultiLine = comment.text.includes("\n");
+    let textEl;
+    if (isMultiLine) {
+      textEl = contentEl.createEl("textarea", {
+        cls: "comment-text comment-textarea",
+        attr: {
+          spellcheck: "false",
+          rows: (comment.text.split("\n").length + 1).toString()
+        }
+      });
+      textEl.value = comment.text || "";
+    } else {
+      textEl = contentEl.createEl("div", {
+        cls: "comment-text",
+        attr: { contenteditable: "true", spellcheck: "false" }
+      });
+      textEl.textContent = comment.text || "(empty comment)";
+    }
+    const currentSearchTerm = this.currentSearchTerm || "";
+    if (currentSearchTerm && comment.text.toLowerCase().includes(currentSearchTerm) && !isMultiLine) {
+      if (textEl.tagName === "DIV") {
+        textEl.innerHTML = this.highlightSearchText(comment.text || "(empty comment)", currentSearchTerm);
+      }
+    }
+    const lineEl = contentEl.createEl("div", {
+      text: `Line ${comment.line + 1}`,
+      cls: "comment-line"
+    });
+    const actionsEl = commentEl.createEl("div", { cls: "comment-actions" });
+    const saveBtn = actionsEl.createEl("button", {
+      text: "Save",
+      cls: "comment-btn comment-save-btn"
+    });
+    saveBtn.style.display = "none";
+    const cancelBtn = actionsEl.createEl("button", {
+      text: "Cancel",
+      cls: "comment-btn comment-cancel-btn"
+    });
+    cancelBtn.style.display = "none";
+    const convertBtn = actionsEl.createEl("button", {
+      cls: "comment-btn comment-convert-btn",
+      attr: { title: "Convert to callout" }
+    });
+    convertBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+    const deleteBtn = actionsEl.createEl("button", {
+      text: "\xD7",
+      cls: "comment-btn comment-delete-btn",
+      attr: { title: "Delete comment" }
+    });
+    this.setupCommentElementEvents(commentEl, textEl, comment, saveBtn, cancelBtn, convertBtn, deleteBtn, currentSearchTerm);
   }
   updateCommentInEditor(comment, newText) {
     this.debug("updateCommentInEditor called with:", newText);
@@ -1438,7 +1585,12 @@ var CommentsManagerSettingTab = class extends import_obsidian.PluginSettingTab {
       this.plugin.settings.openOnStart = value;
       await this.plugin.saveSettings();
     }));
-    new import_obsidian.Setting(containerEl).setName("Default collapsed view").setDesc("Start with comments panel in collapsed state (showing only headers)").addToggle((toggle) => toggle.setValue(this.plugin.settings.defaultCollapsed).onChange(async (value) => {
+    new import_obsidian.Setting(containerEl).setName("Default view mode").setDesc("Choose the default view mode for the comments panel").addDropdown((dropdown) => dropdown.addOption("outliner", "Outliner (grouped by headers)").addOption("list", "List (flat list of comments)").setValue(this.plugin.settings.defaultViewMode).onChange(async (value) => {
+      this.plugin.settings.defaultViewMode = value;
+      await this.plugin.saveSettings();
+      this.plugin.refreshCommentsView();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Default collapsed view").setDesc("Start with comments panel in collapsed state (applies to outliner view only)").addToggle((toggle) => toggle.setValue(this.plugin.settings.defaultCollapsed).onChange(async (value) => {
       this.plugin.settings.defaultCollapsed = value;
       await this.plugin.saveSettings();
       this.plugin.refreshCommentsView();
@@ -1461,9 +1613,13 @@ var CommentsManagerSettingTab = class extends import_obsidian.PluginSettingTab {
       await this.plugin.saveSettings();
     }));
     const instructionsEl = containerEl.createEl("div", { cls: "print-mode-instructions" });
+    instructionsEl.createEl("h4", { text: "View Modes:" });
+    const viewModesList = instructionsEl.createEl("ul");
+    viewModesList.createEl("li", { text: "Outliner View: Comments are grouped under their nearest preceding header in a hierarchical tree structure" });
+    viewModesList.createEl("li", { text: "List View: Comments are shown in a flat list in document order, without any grouping" });
     instructionsEl.createEl("h4", { text: "How to use Print Mode:" });
     const instructionsList = instructionsEl.createEl("ol");
-    instructionsList.createEl("li", { text: 'Click the print icon in the Comments panel or use the command "Activate Print Mode"' });
+    instructionsList.createEl("li", { text: 'Click the printer icon button in the Comments panel or use the command "Activate Print Mode"' });
     instructionsList.createEl("li", { text: "Preview how your document will look with comments converted to callouts" });
     instructionsList.createEl("li", { text: 'Click "Export to PDF" to trigger PDF export with converted comments' });
     instructionsList.createEl("li", { text: "Your original document remains unchanged - comments are converted temporarily" });
