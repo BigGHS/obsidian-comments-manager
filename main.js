@@ -627,7 +627,7 @@ var CommentsView = class extends import_obsidian.ItemView {
       cls: `view-mode-btn ${this.currentViewMode === "outliner" ? "active" : ""}`,
       attr: { title: "Outliner view (grouped by headers)" }
     });
-    (0, import_obsidian.setIcon)(outlinerBtn, "layout-grid");
+    (0, import_obsidian.setIcon)(outlinerBtn, "list-tree");
     const listBtn = viewModeContainer.createEl("button", {
       cls: `view-mode-btn ${this.currentViewMode === "list" ? "active" : ""}`,
       attr: { title: "List view (flat list of comments)" }

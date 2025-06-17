@@ -886,7 +886,7 @@ class CommentsView extends ItemView {
 				cls: `view-mode-btn ${this.currentViewMode === 'outliner' ? 'active' : ''}`,
 				attr: { title: 'Outliner view (grouped by headers)' }
 			});
-			setIcon(outlinerBtn, 'layout-grid'); // or 'network' for hierarchy look
+			setIcon(outlinerBtn, 'list-tree');
 	
 			const listBtn = viewModeContainer.createEl('button', {
 				cls: `view-mode-btn ${this.currentViewMode === 'list' ? 'active' : ''}`,
