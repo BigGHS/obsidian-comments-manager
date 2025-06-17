@@ -46,7 +46,7 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	align-items: center;
 	justify-content: center;
 	width: 32px;
-	height: 24px;
+	height: 28px;
 	padding: 0;
 	border: none;
 	background: var(--background-secondary);
@@ -377,7 +377,7 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	align-items: center;
 	justify-content: center;
 	width: 32px;
-	height: 24px;
+	height: 28px;
 	padding: 0;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
@@ -409,7 +409,7 @@ Comments Manager - Enhanced with Print Mode and Dual View functionality
 	align-items: center;
 	justify-content: center;
 	width: 32px;
-	height: 24px;
+	height: 28px;
 	padding: 0;
 	border: 1px solid var(--background-modifier-border);
 	background: var(--background-secondary);
